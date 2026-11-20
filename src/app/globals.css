@@ -1,0 +1,317 @@
+@import "tailwindcss";
+
+:root {
+  --fitloom-bg: #ffffff;
+  --fitloom-surface: #f7f5ff;
+  --fitloom-surface-strong: #ede9fe;
+  --fitloom-ink: #111827;
+  --fitloom-muted: #4b5563;
+  --fitloom-violet: #6633ee;
+  --fitloom-violet-deep: #4c1d95;
+  --fitloom-border: #e5e7eb;
+  --fitloom-border-violet: #ddd6fe;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  color: var(--fitloom-ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+::selection {
+  background-color: rgba(102, 51, 238, 0.16);
+  color: #1e1b4b;
+}
+
+/* Homepage Section 05 horizontal discovery carousel (scroll contained on X axis only) */
+.fitloom-carousel-track {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 51, 238, 0.28) transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fitloom-carousel-track {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Homepage Section 09 native <details> accordion disclosure */
+.fitloom-faq-item > summary {
+  list-style: none;
+}
+
+.fitloom-faq-item > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fitloom-faq-chevron {
+  flex-shrink: 0;
+}
+
+.fitloom-faq-item[open] .fitloom-faq-chevron {
+  transform: rotate(180deg);
+}
+
+.fitloom-faq-item::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+
+.fitloom-faq-item:not([open])::details-content {
+  block-size: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fitloom-faq-chevron {
+    transition: transform 0.2s ease;
+  }
+
+  .fitloom-faq-item::details-content {
+    transition-property: block-size, content-visibility;
+    transition-duration: 0.28s;
+    transition-timing-function: ease-in-out;
+    transition-behavior: allow-discrete;
+  }
+}
+
+/* PH3 visual refinement: typography & carousel polish */
+.fitloom-heading-balance {
+  text-wrap: balance;
+}
+
+.fitloom-prose-pretty {
+  text-wrap: pretty;
+}
+
+/* PH4 shared navigation drawer, anchor scroll clearance & toast top-layer styling */
+html {
+  scroll-padding-top: 5.25rem;
+}
+
+.fitloom-toast-region {
+  position: fixed;
+  inset: auto;
+  inset-block-end: 1rem;
+  inset-inline: 1rem;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  z-index: 60;
+}
+
+@media (min-width: 640px) {
+  .fitloom-toast-region {
+    inset-inline-start: auto;
+    inset-inline-end: 1.25rem;
+    inset-block-end: 1.25rem;
+    inline-size: min(24rem, calc(100dvw - 2.5rem));
+  }
+}
+
+html:has(dialog.fitloom-nav-drawer:modal) {
+  overflow: hidden;
+}
+
+dialog.fitloom-nav-drawer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+dialog.fitloom-nav-drawer::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  dialog.fitloom-nav-drawer {
+    transition:
+      display 0.2s,
+      overlay 0.2s;
+    transition-behavior: allow-discrete;
+  }
+
+  dialog.fitloom-nav-drawer::backdrop {
+    opacity: 0;
+    transition:
+      opacity 0.2s ease-out,
+      display 0.2s,
+      overlay 0.2s;
+    transition-behavior: allow-discrete;
+  }
+
+  dialog.fitloom-nav-drawer[open]::backdrop {
+    opacity: 1;
+  }
+
+  @starting-style {
+    dialog.fitloom-nav-drawer[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  dialog.fitloom-nav-drawer .fitloom-nav-sheet {
+    opacity: 0;
+    translate: 100% 0;
+    transition:
+      opacity 0.2s ease-out,
+      translate 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  dialog.fitloom-nav-drawer[open] .fitloom-nav-sheet {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  @starting-style {
+    dialog.fitloom-nav-drawer[open] .fitloom-nav-sheet {
+      opacity: 0;
+      translate: 100% 0;
+    }
+  }
+
+  dialog.fitloom-nav-drawer .fitloom-nav-sheet-left {
+    opacity: 0;
+    translate: -100% 0;
+    transition:
+      opacity 0.2s ease-out,
+      translate 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  dialog.fitloom-nav-drawer[open] .fitloom-nav-sheet-left {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  @starting-style {
+    dialog.fitloom-nav-drawer[open] .fitloom-nav-sheet-left {
+      opacity: 0;
+      translate: -100% 0;
+    }
+  }
+}
+
+/* Auth 3D fashion studio showcase animations (GPU-composited, reduced-motion safe) */
+@keyframes fitloom-auth-float {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0) rotateY(-4deg) rotateZ(-1deg);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotateY(4deg) rotateZ(1deg);
+  }
+}
+
+@keyframes fitloom-auth-ring-cw {
+  from {
+    transform: rotateX(74deg) rotateY(-12deg) rotateZ(0deg);
+  }
+  to {
+    transform: rotateX(74deg) rotateY(-12deg) rotateZ(360deg);
+  }
+}
+
+@keyframes fitloom-auth-ring-ccw {
+  from {
+    transform: rotateX(68deg) rotateY(14deg) rotateZ(360deg);
+  }
+  to {
+    transform: rotateX(68deg) rotateY(14deg) rotateZ(0deg);
+  }
+}
+
+@keyframes fitloom-auth-card-drift-a {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes fitloom-auth-card-drift-b {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0);
+  }
+  50% {
+    transform: translate3d(0, 9px, 0);
+  }
+}
+
+@keyframes fitloom-auth-pulse {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes fitloom-auth-particle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: translate3d(0, 0, 0) scale(0.9);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate3d(0, -12px, 0) scale(1.2);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fitloom-auth-garment {
+    animation: fitloom-auth-float 6s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  .fitloom-auth-ring-primary {
+    animation: fitloom-auth-ring-cw 18s linear infinite;
+    will-change: transform;
+  }
+
+  .fitloom-auth-ring-secondary {
+    animation: fitloom-auth-ring-ccw 24s linear infinite;
+    will-change: transform;
+  }
+
+  .fitloom-auth-card-a {
+    animation: fitloom-auth-card-drift-a 5.5s ease-in-out infinite;
+  }
+
+  .fitloom-auth-card-b {
+    animation: fitloom-auth-card-drift-b 6.5s ease-in-out infinite;
+  }
+
+  .fitloom-auth-glow-pulse {
+    animation: fitloom-auth-pulse 5s ease-in-out infinite;
+  }
+
+  .fitloom-auth-mote {
+    animation: fitloom-auth-particle 4.5s ease-in-out infinite;
+  }
+}

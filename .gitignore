@@ -1,1 +1,22 @@
-node_modules
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build files
+*.tsbuildinfo
+
+# Deployment
+.vercel/
+
+# System files
+.DS_Store
+Thumbs.db
