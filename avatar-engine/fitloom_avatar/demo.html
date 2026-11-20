@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FITLOOM — 3D Avatar Studio</title>
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --panel: #131822;
+      --card: #1a2130;
+      --border: #263044;
+      --text: #e6edf7;
+      --muted: #8b9bb4;
+      --accent: #4f8cff;
+      --accent-hover: #3b78f0;
+      --ok: #2ecc71;
+      --err: #ff5c5c;
+      --chest: #38bdf8;
+      --waist: #fbbf24;
+      --hip: #f472b6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 375px 1fr;
+      overflow: hidden;
+    }
+    aside {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .brand h1 { font-size: 18px; letter-spacing: 0.6px; }
+    .unit-toggle {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .unit-toggle button {
+      background: transparent;
+      color: var(--muted);
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .unit-toggle button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+    }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    input[type="file"], input[type="text"], input[type="number"], select {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 9px;
+      font-size: 13px;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row-inline { display: flex; gap: 8px; align-items: center; }
+    .ftin-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .input-unit { position: relative; }
+    .input-unit span {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+    .input-unit input { padding-right: 26px; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary {
+      background: #232d40;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.secondary:hover { background: #2d3950; }
+    button.secondary.on {
+      border-color: var(--accent);
+      background: #1d3154;
+    }
+    .slider-group { display: flex; flex-direction: column; gap: 4px; }
+    .slider-header { display: flex; justify-content: space-between; font-size: 12px; align-items: center; }
+    .slider-header .zone-label { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .slider-header span:last-child { font-weight: 600; color: var(--text); }
+    input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+    #deltaBox {
+      display: none;
+      font-size: 11.5px;
+      line-height: 1.5;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #122033;
+      border: 1px solid #28466e;
+      color: #cfe3ff;
+    }
+    .swatches { display: flex; gap: 8px; align-items: center; }
+    .swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; }
+    .metric {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .metric span:first-child { color: var(--muted); }
+    .metric span:last-child { font-weight: 600; text-align: right; }
+    #status {
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+    }
+    #status.err { color: var(--err); border-color: #5c2626; }
+    #status.ok { color: var(--ok); border-color: #265239; }
+    main {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      background: radial-gradient(circle at 50% 35%, #1d2638 0%, #0b0e14 75%);
+    }
+    #viewer { width: 100%; height: 100%; display: block; }
+    .toolbar {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .legend {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(19, 24, 34, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11.5px;
+      color: var(--muted);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      backdrop-filter: blur(6px);
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .hud {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(19, 24, 34, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      backdrop-filter: blur(6px);
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <aside>
+    <div class="brand">
+      <h1>FITLOOM 3D</h1>
+      <div class="unit-toggle" role="group" aria-label="Unit system">
+        <button id="unitImp" class="active" type="button">ft / in</button>
+        <button id="unitMet" type="button">cm</button>
+      </div>
+    </div>
+
+    <div id="status">Loading avatar...</div>
+
+    <!-- 1. Load Existing Avatar -->
+    <div class="card">
+      <h2>1. Load Existing Avatar</h2>
+      <div class="row-inline">
+        <input id="loadIdInput" type="text" value="3440626d9ec5" placeholder="avatar_id" />
+        <button id="loadBtn" class="secondary" style="white-space:nowrap;">Load</button>
+      </div>
+    </div>
+
+    <!-- 2. Generate From Photos -->
+    <div class="card">
+      <h2>2. Generate From Photos</h2>
+      <div>
+        <label>Front Photo (required)</label>
+        <input id="frontFile" type="file" accept="image/*" />
+      </div>
+      <div>
+        <label>Side Photo (optional — upload true 90&deg; side only)</label>
+        <input id="sideFile" type="file" accept="image/*" />
+      </div>
+      <div class="row">
+        <div>
+          <label>Body Model</label>
+          <select id="genderSelect">
+            <option value="neutral">Neutral</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+        <div>
+          <label id="heightInputLabel">Height (ft / in)</label>
+          <div id="heightImpWrap" class="ftin-wrap">
+            <div class="input-unit">
+              <input id="initFt" type="number" min="3" max="7" step="1" placeholder="5" />
+              <span>ft</span>
+            </div>
+            <div class="input-unit">
+              <input id="initIn" type="number" min="0" max="11.5" step="0.5" placeholder="8" />
+              <span>in</span>
+            </div>
+          </div>
+          <div id="heightMetWrap" class="input-unit" style="display:none;">
+            <input id="initHeightCm" type="number" step="0.5" placeholder="172" />
+            <span>cm</span>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Weight (recommended)</label>
+          <div class="row-inline" style="gap:6px;">
+            <input id="initWeight" type="number" step="0.5" min="30" max="440" placeholder="e.g. 55" />
+            <select id="weightUnit" style="width:72px;flex-shrink:0;">
+              <option value="kg" selected>kg</option>
+              <option value="lbs">lbs</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label>Clothing in Photo</label>
+          <select id="clothingFit">
+            <option value="fitted">Fitted (tight)</option>
+            <option value="regular" selected>Regular</option>
+            <option value="loose">Loose / baggy</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label>Body Build Hint</label>
+        <select id="buildType">
+          <option value="slim">Slim / lean</option>
+          <option value="average" selected>Average</option>
+          <option value="athletic">Athletic (broad chest, trim waist)</option>
+          <option value="broad">Broad / stocky</option>
+        </select>
+      </div>
+      <button id="genBtn">Generate 3D Avatar</button>
+    </div>
+
+    <!-- 3. Customize Body Proportions -->
+    <div class="card">
+      <h2>3. Customize Body Proportions</h2>
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="zone-label"><span class="dot" style="background:#a78bfa;"></span>Height</span>
+          <span id="valHeight">--</span>
+        </div>
+        <input id="slHeight" type="range" min="120" max="210" step="0.5" value="175" data-zone="height" />
+      </div>
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="zone-label"><span class="dot" style="background:var(--chest);"></span>Chest / Bust</span>
+          <span id="valChest">--</span>
+        </div>
+        <input id="slChest" type="range" min="65" max="145" step="0.5" value="100" data-zone="chest" />
+      </div>
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="zone-label"><span class="dot" style="background:var(--waist);"></span>Waist</span>
+          <span id="valWaist">--</span>
+        </div>
+        <input id="slWaist" type="range" min="55" max="140" step="0.5" value="84" data-zone="waist" />
+      </div>
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="zone-label"><span class="dot" style="background:var(--hip);"></span>Hips</span>
+          <span id="valHip">--</span>
+        </div>
+        <input id="slHip" type="range" min="65" max="150" step="0.5" value="98" data-zone="hip" />
+      </div>
+      <button id="applyBtn" disabled>Apply Body Shape</button>
+      <div id="deltaBox"></div>
+    </div>
+
+    <!-- Appearance -->
+    <div class="card">
+      <h2>Mannequin Tone</h2>
+      <div class="swatches" id="swatches">
+        <div class="swatch active" data-color="#cfd6e0" style="background:#cfd6e0;" title="Studio Clay"></div>
+        <div class="swatch" data-color="#f2d3bc" style="background:#f2d3bc;" title="Fair"></div>
+        <div class="swatch" data-color="#ddb08d" style="background:#ddb08d;" title="Medium"></div>
+        <div class="swatch" data-color="#b8845c" style="background:#b8845c;" title="Tan / Olive"></div>
+        <div class="swatch" data-color="#87593a" style="background:#87593a;" title="Brown"></div>
+        <div class="swatch" data-color="#543523" style="background:#543523;" title="Deep"></div>
+      </div>
+    </div>
+
+    <!-- Tailoring Measurements -->
+    <div class="card">
+      <h2>Tailoring Measurements</h2>
+      <div class="metrics">
+        <div class="metric"><span>Height</span><span id="mHeight">--</span></div>
+        <div class="metric"><span>Shoulder</span><span id="mShoulder">--</span></div>
+        <div class="metric"><span>Chest/Bust</span><span id="mChest">--</span></div>
+        <div class="metric"><span>Waist</span><span id="mWaist">--</span></div>
+        <div class="metric"><span>Hip</span><span id="mHip">--</span></div>
+        <div class="metric"><span>Inseam</span><span id="mInseam">--</span></div>
+        <div class="metric"><span>Arm</span><span id="mArm">--</span></div>
+        <div class="metric"><span>Avatar ID</span><span id="mId">--</span></div>
+      </div>
+    </div>
+  
+    <style>
+      .try-box{border-top:1px solid #263248;margin-top:14px;padding-top:14px}
+      .size-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+      .sz-btn{background:#182235;border:1px solid #2c3b57;color:#dbe7ff;padding:7px 4px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;position:relative}
+      .sz-btn.active{background:#2563eb;border-color:#60a5fa;color:#fff}
+      .sz-btn.rec::after{content:'BEST';position:absolute;top:-7px;right:4px;background:#16a34a;color:#fff;font-size:8px;padding:1px 4px;border-radius:4px}
+      .sw-row{display:flex;gap:7px;margin:6px 0 10px}
+      .sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+      .sw.active{border-color:#fff;transform:scale(1.12)}
+      .fit-card{background:#111a2b;border:1px solid #25344f;border-radius:8px;padding:10px;margin-top:10px;font-size:12px;line-height:1.45;display:none}
+      .z-row{display:flex;justify-content:space-between;margin:3px 0}
+      .hm-leg{display:none;font-size:11px;color:#9fb2cf;margin-top:6px;gap:8px;flex-wrap:wrap}
+    </style>
+    <div class="try-box" id="tryOnSection">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#8ea4c8;margin-bottom:8px">4. 3D VIRTUAL TRY-ON &amp; FIT</div>
+      <div class="row" style="gap:6px;margin-bottom:8px"><button id="presetFemBtn" type="button" class="secondary" style="padding:6px;font-size:11px">Female Preset (5'4")</button><button id="presetMaleBtn" type="button" class="secondary" style="padding:6px;font-size:11px">Male Preset (5'8")</button></div>
+      <div class="row">
+        <div><label>Garment</label><select id="tryGarment"><option value="tshirt" selected>T-Shirt</option><option value="shirt">Button-Down Shirt</option><option value="trousers">Trousers</option><option value="kurti">Kurti / Tunic</option></select></div>
+        <div><label>Fit Preference</label><select id="tryPref"><option value="slim">Slim</option><option value="regular" selected>Regular</option><option value="extended">Extended</option></select></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>View Mode</label><select id="tryView"><option value="fabric" selected>Fabric View</option><option value="heatmap">Fit Heatmap</option></select></div>
+        <div><label>Fabric Color</label><div class="sw-row" id="trySwatches">
+          <span class="sw active" data-c="#2563eb" style="background:#2563eb"></span>
+          <span class="sw" data-c="#334155" style="background:#334155"></span>
+          <span class="sw" data-c="#e2e8f0" style="background:#e2e8f0"></span>
+          <span class="sw" data-c="#3f6212" style="background:#3f6212"></span>
+          <span class="sw" data-c="#7f1d1d" style="background:#7f1d1d"></span>
+        </div></div>
+      </div>
+      <div class="hm-leg" id="hmLegend"><span><b style="color:#ef4444">&#9632;</b> Tight</span><span><b style="color:#f59e0b">&#9632;</b> Snug</span><span><b style="color:#22c55e">&#9632;</b> Ideal</span><span><b style="color:#38bdf8">&#9632;</b> Relaxed/Loose</span></div>
+      <details id="storeChartBox" style="margin:8px 0;background:#0f172a;border:1px solid #263248;border-radius:8px;padding:7px 9px">
+        <summary style="cursor:pointer;font-size:11px;font-weight:700;color:#93c5fd">Store Size Chart (Flipkart / Myntra / Custom)</summary>
+        <div class="row" style="margin-top:6px">
+          <div><label>Chart Type</label><select id="chartType"><option value="garment" selected>Garment Specs</option><option value="body">To-Fit Body</option></select></div>
+          <div><label>Units</label><select id="chartUnit"><option value="in" selected>Inches</option><option value="cm">cm</option></select></div>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin:6px 0">
+          <button type="button" class="secondary" data-pre="default" style="padding:3px 6px;font-size:10px">Default</button>
+          <button type="button" class="secondary" data-pre="myntra_tee" style="padding:3px 6px;font-size:10px">Myntra Tee</button>
+          <button type="button" class="secondary" data-pre="fk_shirt" style="padding:3px 6px;font-size:10px">Flipkart Shirt</button>
+          <button type="button" class="secondary" data-pre="zara_jeans" style="padding:3px 6px;font-size:10px">Slim Jeans</button>
+        </div>
+        <textarea id="customChartText" rows="4" placeholder="Paste CSV/table, e.g.&#10;size,chest,length&#10;S,38,26.5&#10;M,40,27.5" style="width:100%;background:#020617;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px;font-family:monospace;font-size:11px;box-sizing:border-box"></textarea>
+        <button id="applyChartBtn" type="button" style="margin-top:5px;width:100%;padding:6px;font-size:11px">Apply Store Chart</button>
+      </details>
+      <label style="margin-top:6px">Click Size to Dress Mannequin</label>
+      <div class="size-grid" id="trySizes"></div>
+      <div class="row" style="gap:6px">
+        <button id="tryDressBtn" type="button">Try Recommended</button>
+        <button id="tryClearBtn" type="button" style="background:#263248">Clear Clothes</button>
+      </div>
+      <div class="fit-card" id="fitReport"></div>
+    </div>
+
+  </aside>
+
+  <main>
+    <canvas id="viewer"></canvas>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--chest);"></i>Chest</span>
+      <span><i class="dot" style="background:var(--waist);"></i>Waist</span>
+      <span><i class="dot" style="background:var(--hip);"></i>Hips</span>
+      <span id="ghostLegend" style="display:none;"><i class="dot" style="background:#fb923c;"></i>Previous Shape</span>
+    </div>
+    <div class="toolbar">
+      <button id="ringsBtn" class="secondary on">Tape Rings: On</button>
+      <button id="ghostBtn" class="secondary on">Compare Ghost: On</button>
+      <button id="poseBtn" class="secondary">Pose: A-Pose</button>
+      <button id="wireBtn" class="secondary">Wireframe: Off</button>
+      <button id="camBtn" class="secondary">Reset Camera</button>
+    </div>
+    <div class="hud">Drag to rotate &bull; Scroll to zoom &bull; Amber ghost = previous body shape before your last edit</div>
+  </main>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // --- Three.js Scene ---
+    const canvas = document.getElementById('viewer');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 50);
+    camera.position.set(0, 1.15, 2.75);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0.9, 0);
+    controls.minDistance = 0.7;
+    controls.maxDistance = 6.0;
+
+    scene.add(new THREE.HemisphereLight(0xeef4ff, 0x222836, 1.1));
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+    keyLight.position.set(2.2, 3.8, 2.6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xbfd6ff, 0.65);
+    fillLight.position.set(-2.5, 2.0, 1.5);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0x88b4ff, 0.85);
+    rimLight.position.set(0, 2.5, -3.0);
+    scene.add(rimLight);
+
+    // 3m x 3m floor grid (10cm squares)
+    scene.add(new THREE.GridHelper(3.0, 30, 0x3b4d6b, 0x1f2838));
+
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(1.6, 48),
+      new THREE.ShadowMaterial({ opacity: 0.28 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Subtle vertical height reference pole on the left (0 to 2.1m with 1 ft & 6 in ticks)
+    const poleMat = new THREE.LineBasicMaterial({ color: 0x3a4a66, transparent: true, opacity: 0.6 });
+    const poleGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.68, 0, 0),
+      new THREE.Vector3(-0.68, 2.1, 0),
+    ]);
+    scene.add(new THREE.Line(poleGeo, poleMat));
+    for (let ft = 1; ft <= 6; ft++) {
+      const y = ft * 0.3048;
+      const tickGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.74, y, 0),
+        new THREE.Vector3(-0.62, y, 0),
+      ]);
+      scene.add(new THREE.Line(tickGeo, poleMat));
+    }
+
+    const loader = new GLTFLoader();
+    let currentGroup = null;
+    let ringsGroup = null;
+    let ghostGroup = null;
+    let currentAvatarId = null;
+    let lastMeasurements = null;
+    let currentPose = 'apose';
+    let currentColor = '#cfd6e0';
+    let wireframeOn = false;
+    let showRings = true;
+    let showGhost = true;
+    let unitMode = 'imperial'; // 'imperial' (ft/in) | 'metric' (cm)
+
+    function resize() {
+      const w = canvas.parentElement.clientWidth;
+      const h = canvas.parentElement.clientHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // --- Unit Formatting ---
+    function cmToFtInStr(cm) {
+      const totalIn = Number(cm) / 2.54;
+      let ft = Math.floor(totalIn / 12);
+      let inch = Math.round((totalIn - ft * 12) * 10) / 10;
+      if (inch >= 12) { ft += 1; inch = 0; }
+      return `${ft}' ${inch.toFixed(1)}"`;
+    }
+    function fmtHeight(cm, includeSecondary = false) {
+      if (cm === undefined || cm === null) return '--';
+      if (unitMode === 'imperial') {
+        return includeSecondary
+          ? `${cmToFtInStr(cm)} (${Number(cm).toFixed(0)} cm)`
+          : cmToFtInStr(cm);
+      }
+      return includeSecondary
+        ? `${Number(cm).toFixed(1)} cm (${cmToFtInStr(cm)})`
+        : `${Number(cm).toFixed(1)} cm`;
+    }
+    function fmtLen(cm) {
+      if (cm === undefined || cm === null) return '--';
+      if (unitMode === 'imperial') return `${(Number(cm) / 2.54).toFixed(1)} in`;
+      return `${Number(cm).toFixed(1)} cm`;
+    }
+    function fmtDelta(diffCm) {
+      if (Math.abs(diffCm) < 0.15) return 'no change';
+      const sign = diffCm > 0 ? '+' : '';
+      if (unitMode === 'imperial') return `${sign}${(diffCm / 2.54).toFixed(1)} in`;
+      return `${sign}${diffCm.toFixed(1)} cm`;
+    }
+
+    const statusEl = document.getElementById('status');
+    function setStatus(msg, cls = '') {
+      statusEl.textContent = msg;
+      statusEl.className = cls;
+    }
+
+    function disposeGroup(grp) {
+      if (!grp) return;
+      scene.remove(grp);
+      grp.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) {
+          if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose());
+          else o.material.dispose();
+        }
+      });
+    }
+
+    function applyMaterialSettings(root) {
+      if (!root) return;
+      root.traverse((obj) => {
+        if (obj.isMesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+          obj.material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColor),
+            roughness: 0.56,
+            metalness: 0.04,
+            wireframe: wireframeOn,
+          });
+        }
+      });
+    }
+
+    function buildMeasureRings(root, heightM) {
+      const group = new THREE.Group();
+      root.updateMatrixWorld(true);
+      const v = new THREE.Vector3();
+      const maxTorsoX = Math.max(0.24, 0.28 * (heightM / 1.7));
+      const specs = [
+        { key: 'chest', frac: 0.72, color: 0x38bdf8 },
+        { key: 'waist', frac: 0.61, color: 0xfbbf24 },
+        { key: 'hip',   frac: 0.51, color: 0xf472b6 },
+      ];
+      const bounds = specs.map(() => ({
+        minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity, count: 0
+      }));
+
+      root.traverse((obj) => {
+        if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
+        const pos = obj.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+          if (Math.abs(v.x) > maxTorsoX) continue;
+          for (let s = 0; s < specs.length; s++) {
+            const yTarget = specs[s].frac * heightM;
+            if (Math.abs(v.y - yTarget) < 0.025) {
+              const b = bounds[s];
+              if (v.x < b.minX) b.minX = v.x;
+              if (v.x > b.maxX) b.maxX = v.x;
+              if (v.z < b.minZ) b.minZ = v.z;
+              if (v.z > b.maxZ) b.maxZ = v.z;
+              b.count++;
+            }
+          }
+        }
+      });
+
+      specs.forEach((sp, idx) => {
+        const b = bounds[idx];
+        if (b.count < 6) return;
+        const cx = (b.minX + b.maxX) / 2;
+        const cz = (b.minZ + b.maxZ) / 2;
+        const rx = Math.max((b.maxX - b.minX) / 2 + 0.008, 0.05);
+        const rz = Math.max((b.maxZ - b.minZ) / 2 + 0.008, 0.05);
+        const pts = [];
+        for (let i = 0; i <= 64; i++) {
+          const a = (i / 64) * Math.PI * 2;
+          pts.push(new THREE.Vector3(cx + Math.cos(a) * rx, sp.frac * heightM, cz + Math.sin(a) * rz));
+        }
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        const mat = new THREE.LineBasicMaterial({ color: sp.color, transparent: true, opacity: 0.7 });
+        const line = new THREE.Line(geo, mat);
+        line.userData.zone = sp.key;
+        group.add(line);
+      });
+
+      // Head-top height indicator bar connecting avatar crown to left height pole
+      const headGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.68, heightM, 0),
+        new THREE.Vector3(0.0, heightM, 0),
+      ]);
+      const headMat = new THREE.LineBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.65 });
+      const headLine = new THREE.Line(headGeo, headMat);
+      headLine.userData.zone = 'height';
+      group.add(headLine);
+
+      group.visible = showRings;
+      return group;
+    }
+
+    function highlightRing(zone) {
+      if (!ringsGroup) return;
+      ringsGroup.children.forEach((line) => {
+        if (!zone) {
+          line.material.opacity = 0.7;
+        } else {
+          line.material.opacity = line.userData.zone === zone ? 1.0 : 0.22;
+        }
+      });
+    }
+
+    function frameAvatar(heightM) {
+      const midY = Math.max(heightM * 0.52, 0.5);
+      controls.target.set(0, midY, 0);
+      camera.position.set(0, midY + 0.15, Math.max(heightM * 1.65, 1.8));
+      controls.update();
+    }
+
+    async function loadGlb(avatarId, { resetCamera = false, keepPreviousAsGhost = false } = {}) {
+      const url = `/avatars/${avatarId}/${currentPose}.glb?t=${Date.now()}`;
+      return new Promise((resolve, reject) => {
+        loader.load(
+          url,
+          (gltf) => {
+            if (keepPreviousAsGhost && currentGroup) {
+              disposeGroup(ghostGroup);
+              ghostGroup = currentGroup;
+              ghostGroup.traverse((o) => {
+                if (o.isMesh) {
+                  o.castShadow = false;
+                  o.receiveShadow = false;
+                  o.material = new THREE.MeshStandardMaterial({
+                    color: 0xfb923c,
+                    transparent: true,
+                    opacity: 0.26,
+                    roughness: 0.7,
+                    depthWrite: false,
+                  });
+                }
+              });
+              ghostGroup.visible = showGhost;
+              document.getElementById('ghostLegend').style.display = showGhost ? 'inline-flex' : 'none';
+              currentGroup = null;
+            } else {
+              if (!keepPreviousAsGhost) {
+                disposeGroup(ghostGroup);
+                ghostGroup = null;
+                document.getElementById('ghostLegend').style.display = 'none';
+              }
+              disposeGroup(currentGroup);
+              currentGroup = null;
+            }
+
+            disposeGroup(ringsGroup);
+            ringsGroup = null;
+
+            const root = gltf.scene;
+            const box = new THREE.Box3().setFromObject(root);
+            const size = new THREE.Vector3();
+            const center = new THREE.Vector3();
+            box.getSize(size);
+            box.getCenter(center);
+
+            root.position.set(-center.x, -box.min.y, -center.z);
+            applyMaterialSettings(root);
+
+            currentGroup = new THREE.Group();
+            currentGroup.add(root);
+            scene.add(currentGroup);
+
+            ringsGroup = buildMeasureRings(root, size.y);
+            scene.add(ringsGroup);
+
+            if (resetCamera) frameAvatar(size.y);
+            resolve(size);
+          },
+          undefined,
+          (err) => reject(err)
+        );
+      });
+    }
+
+    // --- Sliders & UI Sync ---
+    const slHeight = document.getElementById('slHeight');
+    const slChest = document.getElementById('slChest');
+    const slWaist = document.getElementById('slWaist');
+    const slHip = document.getElementById('slHip');
+
+    function syncSliderLabels() {
+      document.getElementById('valHeight').textContent = fmtHeight(slHeight.value, true);
+      document.getElementById('valChest').textContent = fmtLen(slChest.value);
+      document.getElementById('valWaist').textContent = fmtLen(slWaist.value);
+      document.getElementById('valHip').textContent = fmtLen(slHip.value);
+    }
+
+    function renderMetrics() {
+      if (!lastMeasurements) return;
+      const m = lastMeasurements;
+      document.getElementById('mHeight').textContent = fmtHeight(m.height_cm, false);
+      document.getElementById('mShoulder').textContent = fmtLen(m.shoulder_width_cm);
+      document.getElementById('mChest').textContent = fmtLen(m.chest_cm);
+      document.getElementById('mWaist').textContent = fmtLen(m.waist_cm);
+      document.getElementById('mHip').textContent = fmtLen(m.hip_cm);
+      document.getElementById('mInseam').textContent = fmtLen(m.inseam_cm);
+      document.getElementById('mArm').textContent = fmtLen(m.arm_length_cm);
+      document.getElementById('mId').textContent = currentAvatarId ? currentAvatarId.slice(0, 8) : '--';
+    }
+
+    [slHeight, slChest, slWaist, slHip].forEach((el) => {
+      el.addEventListener('input', () => {
+        syncSliderLabels();
+        highlightRing(el.dataset.zone);
+      });
+      el.addEventListener('change', () => highlightRing(null));
+    });
+
+    function setUnitMode(mode) {
+      if (unitMode === mode) return;
+      const initFt = document.getElementById('initFt');
+      const initIn = document.getElementById('initIn');
+      const initCm = document.getElementById('initHeightCm');
+
+      // Preserve any typed height across unit switches
+      if (mode === 'metric') {
+        if (initFt.value !== '' || initIn.value !== '') {
+          const cm = ((Number(initFt.value) || 0) * 12 + (Number(initIn.value) || 0)) * 2.54;
+          if (cm > 0) initCm.value = cm.toFixed(1);
+        }
+      } else {
+        if (initCm.value !== '') {
+          const totalIn = Number(initCm.value) / 2.54;
+          let ft = Math.floor(totalIn / 12);
+          let inch = Math.round((totalIn - ft * 12) * 2) / 2;
+          if (inch >= 12) { ft += 1; inch = 0; }
+          initFt.value = ft;
+          initIn.value = inch;
+        }
+      }
+
+      unitMode = mode;
+      document.getElementById('unitImp').classList.toggle('active', mode === 'imperial');
+      document.getElementById('unitMet').classList.toggle('active', mode === 'metric');
+      document.getElementById('heightImpWrap').style.display = mode === 'imperial' ? 'grid' : 'none';
+      document.getElementById('heightMetWrap').style.display = mode === 'metric' ? 'block' : 'none';
+      document.getElementById('heightInputLabel').textContent =
+        mode === 'imperial' ? 'Height (ft / in)' : 'Height (cm)';
+
+      syncSliderLabels();
+      renderMetrics();
+    }
+
+    document.getElementById('unitImp').addEventListener('click', () => setUnitMode('imperial'));
+    document.getElementById('unitMet').addEventListener('click', () => setUnitMode('metric'));
+
+    function updateMeasurementsUI(avatarId, m) {
+      currentAvatarId = avatarId;
+      lastMeasurements = m;
+      try { localStorage.setItem('fitloom_last_avatar', avatarId); } catch {}
+      document.getElementById('loadIdInput').value = avatarId;
+      document.getElementById('applyBtn').disabled = false;
+
+      slHeight.value = m.height_cm ?? 175;
+      slChest.value = m.chest_cm ?? 95;
+      slWaist.value = m.waist_cm ?? 80;
+      slHip.value = m.hip_cm ?? 96;
+      syncSliderLabels();
+      renderMetrics();
+    }
+
+    async function loadExistingAvatar(id) {
+      if (!id) return;
+      document.getElementById('deltaBox').style.display = 'none';
+      setStatus(`Loading avatar ${id}...`);
+      try {
+        const res = await fetch(`/avatars/${id}/measurements.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`Avatar "${id}" not found (${res.status})`);
+        const meas = await res.json();
+        updateMeasurementsUI(id, meas);
+        await loadGlb(id, { resetCamera: true, keepPreviousAsGhost: false });
+        setStatus(`Loaded ${id}. Adjust sliders & click Apply to compare.`, 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', () => {
+      loadExistingAvatar(document.getElementById('loadIdInput').value.trim());
+    });
+
+    // Generate From Photos
+    document.getElementById('genBtn').addEventListener('click', async () => {
+      const front = document.getElementById('frontFile').files[0];
+      if (!front) {
+        setStatus('Please select a front photo first.', 'err');
+        return;
+      }
+      const btn = document.getElementById('genBtn');
+      btn.disabled = true;
+      document.getElementById('deltaBox').style.display = 'none';
+      setStatus('Running PARE + SMPL-300 reconstruction on GPU...');
+      try {
+        const fd = new FormData();
+        fd.append('front', front);
+        const side = document.getElementById('sideFile').files[0];
+        if (side) fd.append('side', side);
+        fd.append('gender', document.getElementById('genderSelect').value);
+
+        let heightCm = null;
+        if (unitMode === 'imperial') {
+          const ftVal = document.getElementById('initFt').value.trim();
+          const inVal = document.getElementById('initIn').value.trim();
+          if (ftVal !== '' || inVal !== '') {
+            heightCm = ((Number(ftVal) || 0) * 12 + (Number(inVal) || 0)) * 2.54;
+          }
+        } else {
+          const cmVal = document.getElementById('initHeightCm').value.trim();
+          if (cmVal !== '') heightCm = Number(cmVal);
+        }
+        if (heightCm && heightCm >= 100 && heightCm <= 240) {
+          fd.append('height_cm', heightCm.toFixed(1));
+        }
+
+        const wRaw = document.getElementById('initWeight').value.trim();
+        if (wRaw !== '') {
+          let wKg = Number(wRaw);
+          if (document.getElementById('weightUnit').value === 'lbs') wKg *= 0.45359237;
+          if (wKg >= 30 && wKg <= 200) fd.append('weight_kg', wKg.toFixed(1));
+        }
+        fd.append('clothing_fit', document.getElementById('clothingFit').value);
+        fd.append('build_type', document.getElementById('buildType').value);
+
+        const res = await fetch('/avatars/from-images', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+
+        updateMeasurementsUI(data.avatar_id, data.measurements);
+        await loadGlb(data.avatar_id, { resetCamera: true, keepPreviousAsGhost: false });
+        if (data.calibration && data.calibration.applied) {
+          const raw = data.calibration.raw_pare || {};
+          const m = data.measurements;
+          const deltaBox = document.getElementById('deltaBox');
+          deltaBox.innerHTML =
+            `<strong>Weight-calibrated (${data.calibration.weight_kg} kg, ${data.calibration.clothing_fit} clothes):</strong><br>` +
+            `Chest: ${fmtLen(raw.chest_cm)} &rarr; ${fmtLen(m.chest_cm)}<br>` +
+            `Waist: ${fmtLen(raw.waist_cm)} &rarr; ${fmtLen(m.waist_cm)} &bull; ` +
+            `Hips: ${fmtLen(raw.hip_cm)} &rarr; ${fmtLen(m.hip_cm)}`;
+          deltaBox.style.display = 'block';
+          setStatus(`Generated & weight-calibrated avatar ${data.avatar_id}!`, 'ok');
+        } else {
+          setStatus(`Generated avatar ${data.avatar_id}! (Add weight for sharper shape accuracy.)`, 'ok');
+        }
+      } catch (e) {
+        setStatus(`Generation failed: ${e.message}`, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Apply Customization Sliders
+    document.getElementById('applyBtn').addEventListener('click', async () => {
+      if (!currentAvatarId) return;
+      const prev = lastMeasurements ? { ...lastMeasurements } : null;
+      const btn = document.getElementById('applyBtn');
+      btn.disabled = true;
+      setStatus('Optimizing SMPL-300 body proportions...');
+      try {
+        const fd = new FormData();
+        fd.append('height_cm', slHeight.value);
+        fd.append('chest_cm', slChest.value);
+        fd.append('waist_cm', slWaist.value);
+        fd.append('hip_cm', slHip.value);
+
+        const res = await fetch(`/avatars/${currentAvatarId}/customize`, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+
+        const next = data.measurements;
+        updateMeasurementsUI(data.avatar_id, next);
+        await loadGlb(data.avatar_id, { resetCamera: false, keepPreviousAsGhost: true });
+
+        if (prev) {
+          const deltaBox = document.getElementById('deltaBox');
+          deltaBox.innerHTML =
+            `<strong>Updated vs. amber ghost:</strong><br>` +
+            `Height: ${fmtDelta(next.height_cm - prev.height_cm)} &bull; ` +
+            `Chest: ${fmtDelta(next.chest_cm - prev.chest_cm)}<br>` +
+            `Waist: ${fmtDelta(next.waist_cm - prev.waist_cm)} &bull; ` +
+            `Hips: ${fmtDelta(next.hip_cm - prev.hip_cm)}`;
+          deltaBox.style.display = 'block';
+        }
+        clearGarments(); await loadSizingChart();
+        setStatus('Body shape updated! Compare against the amber ghost.', 'ok');
+      } catch (e) {
+        setStatus(`Customize failed: ${e.message}`, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Swatches
+    document.querySelectorAll('.swatch').forEach((sw) => {
+      sw.addEventListener('click', () => {
+        document.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
+        sw.classList.add('active');
+        currentColor = sw.dataset.color;
+        applyMaterialSettings(currentGroup);
+      });
+    });
+
+    // Toolbar toggles
+    document.getElementById('ringsBtn').addEventListener('click', (e) => {
+      showRings = !showRings;
+      e.target.textContent = `Tape Rings: ${showRings ? 'On' : 'Off'}`;
+      e.target.classList.toggle('on', showRings);
+      if (ringsGroup) ringsGroup.visible = showRings;
+    });
+
+    document.getElementById('ghostBtn').addEventListener('click', (e) => {
+      showGhost = !showGhost;
+      e.target.textContent = `Compare Ghost: ${showGhost ? 'On' : 'Off'}`;
+      e.target.classList.toggle('on', showGhost);
+      if (ghostGroup) ghostGroup.visible = showGhost;
+      document.getElementById('ghostLegend').style.display = (showGhost && ghostGroup) ? 'inline-flex' : 'none';
+    });
+
+    document.getElementById('poseBtn').addEventListener('click', async (e) => {
+      currentPose = currentPose === 'apose' ? 'tpose' : 'apose';
+      e.target.textContent = `Pose: ${currentPose === 'apose' ? 'A-Pose' : 'T-Pose'}`;
+      if (currentAvatarId) await loadGlb(currentAvatarId, { resetCamera: false, keepPreviousAsGhost: false });
+    });
+
+    document.getElementById('wireBtn').addEventListener('click', (e) => {
+      wireframeOn = !wireframeOn;
+      e.target.textContent = `Wireframe: ${wireframeOn ? 'On' : 'Off'}`;
+      e.target.classList.toggle('on', wireframeOn);
+      applyMaterialSettings(currentGroup);
+    });
+
+    document.getElementById('camBtn').addEventListener('click', () => {
+      if (currentGroup) {
+        const box = new THREE.Box3().setFromObject(currentGroup);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        frameAvatar(size.y);
+      } else {
+        frameAvatar(1.7);
+      }
+    });
+
+    // Auto-load last used avatar (falls back to 3440626d9ec5)
+    let startId = '3440626d9ec5';
+    try {
+      const saved = localStorage.getItem('fitloom_last_avatar');
+      if (saved) startId = saved;
+    } catch {}
+    syncSliderLabels();
+    loadExistingAvatar(startId);
+  
+    // === FITLOOM 3D GARMENT TRY-ON ===
+    const garmentsGroup = new THREE.Group();
+    scene.add(garmentsGroup);
+    const wornSlots = { top: null, bottom: null };
+    let tryColor = '#2563eb', activeSize = null, lastTryId = null;
+
+    function syncGarmentTransform() {
+      if (!currentGroup) return;
+      currentGroup.updateMatrixWorld(true);
+      let bm = null;
+      currentGroup.traverse(o => { if (!bm && o.isMesh) bm = o; });
+      if (bm) {
+        garmentsGroup.matrixAutoUpdate = false;
+        garmentsGroup.matrix.copy(bm.matrixWorld);
+        garmentsGroup.matrixWorldNeedsUpdate = true;
+      }
+    }
+
+    function clearGarments() {
+      for (const k of ['top', 'bottom']) {
+        if (wornSlots[k]) { garmentsGroup.remove(wornSlots[k]); wornSlots[k] = null; }
+      }
+      const rep = document.getElementById('fitReport');
+      if (rep) rep.style.display = 'none';
+    }
+
+    function renderFitReport(sel, sizing) {
+      const rep = document.getElementById('fitReport');
+      const col = lbl => lbl === 'Too Tight' ? '#ef4444' : (lbl === 'Snug' ? '#f59e0b' : (lbl === 'Ideal' ? '#22c55e' : '#38bdf8'));
+      const rows = Object.entries(sel.zones).map(([k, z]) =>
+        `<div class="z-row"><span style="text-transform:capitalize;color:#cbd5e1">${k}</span>` +
+        `<span style="color:${col(z.label)};font-weight:600">${z.label} (${z.ease_in >= 0 ? '+' : ''}${z.ease_in}")</span></div>`
+      ).join('');
+      const notes = (sel.notes || []).map(n => `<div style="color:#94a3b8;margin-top:4px">&bull; ${n}</div>`).join('');
+      rep.innerHTML =
+        `<div style="display:flex;justify-content:space-between;margin-bottom:6px">` +
+        `<strong>${sizing.garment_type.toUpperCase()} Size ${sel.size}</strong>` +
+        `<strong style="color:#4ade80">${sel.fit_score}/100 &bull; ${sel.overall}</strong></div>` + rows + notes;
+      rep.style.display = 'block';
+    }
+
+    async function loadSizingChart() {
+      if (!currentAvatarId) return;
+      const gt = document.getElementById('tryGarment').value;
+      const pref = document.getElementById('tryPref').value;
+      const fd = new FormData();
+      fd.append('garment_type', gt); fd.append('fit_preference', pref);
+      fd.append('custom_chart', document.getElementById('customChartText').value);
+      fd.append('chart_unit', document.getElementById('chartUnit').value);
+      fd.append('chart_type', document.getElementById('chartType').value);
+      const res = await fetch(`/avatars/${currentAvatarId}/sizing`, { method: 'POST', body: fd });
+      if (!res.ok) return;
+      const data = await res.json();
+      activeSize = data.recommended_size;
+      const grid = document.getElementById('trySizes');
+      grid.innerHTML = '';
+      data.sizes.forEach(s => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sz-btn' + (s.size === data.recommended_size ? ' rec active' : '');
+        b.dataset.sz = s.size;
+        b.textContent = `${s.size} (${s.fit_score})`;
+        b.onclick = () => dressCurrent(s.size);
+        grid.appendChild(b);
+      });
+    }
+
+    async function dressCurrent(sizeOpt) {
+      if (!currentAvatarId) return;
+      const gt = document.getElementById('tryGarment').value;
+      const pref = document.getElementById('tryPref').value;
+      const vm = document.getElementById('tryView').value;
+      document.getElementById('hmLegend').style.display = vm === 'heatmap' ? 'flex' : 'none';
+      const fd = new FormData();
+      fd.append('garment_type', gt);
+      if (sizeOpt) fd.append('size', sizeOpt);
+      fd.append('fit_preference', pref);
+      fd.append('view_mode', vm);
+      fd.append('color_hex', tryColor); fd.append('custom_chart', document.getElementById('customChartText').value); fd.append('chart_unit', document.getElementById('chartUnit').value); fd.append('chart_type', document.getElementById('chartType').value);
+      setStatus(`Dressing ${gt} (${sizeOpt || 'best'})...`, 'info');
+      const res = await fetch(`/avatars/${currentAvatarId}/dress`, { method: 'POST', body: fd });
+      if (!res.ok) { setStatus('Could not dress avatar.', 'err'); return; }
+      const data = await res.json();
+      activeSize = data.selected.size;
+      document.querySelectorAll('#trySizes .sz-btn').forEach(b => b.classList.toggle('active', b.dataset.sz === activeSize));
+      loader.load(`${data.glb_url}?t=${Date.now()}`, gltf => {
+        if (wornSlots[data.slot]) garmentsGroup.remove(wornSlots[data.slot]);
+        const grp = new THREE.Group();
+        const isHm = vm === 'heatmap';
+        if (!window._fbBump) {
+          const c = document.createElement('canvas'); c.width = c.height = 64;
+          const x = c.getContext('2d'); x.fillStyle = '#808080'; x.fillRect(0,0,64,64);
+          for (let j=0;j<64;j+=2) for (let i=0;i<64;i+=2) { const v=(i+j)%4===0?168:102; x.fillStyle=`rgb(${v},${v},${v})`; x.fillRect(i,j,2,2); }
+          const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(22, 22); window._fbBump = t;
+        }
+        gltf.scene.traverse(o => {
+          if (!o.isMesh) return;
+          o.geometry.computeVertexNormals();
+          const pos = o.geometry.attributes.position;
+          if (pos && !o.geometry.attributes.uv) {
+            const uv = new Float32Array(pos.count * 2);
+            for (let i=0;i<pos.count;i++) { uv[i*2]=Math.atan2(pos.getX(i),pos.getZ(i))/(Math.PI*2)+0.5; uv[i*2+1]=pos.getY(i)*1.4; }
+            o.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+          }
+          const useVC = isHm && Boolean(o.geometry.attributes.color);
+          const bc = new THREE.Color(tryColor), sc = bc.clone().lerp(new THREE.Color(0xffffff), 0.42);
+          const mat = new THREE.MeshPhysicalMaterial({ color: useVC ? 0xffffff : bc, vertexColors: useVC, roughness: isHm ? 0.65 : 0.88, metalness: 0, sheen: isHm ? 0 : 0.78, sheenRoughness: 0.62, sheenColor: sc, bumpMap: isHm ? null : window._fbBump, bumpScale: 0.0022, side: THREE.DoubleSide, wireframe: wireframeOn, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+          grp.add(new THREE.Mesh(o.geometry, mat));
+        });
+        wornSlots[data.slot] = grp;
+        garmentsGroup.add(grp);
+        syncGarmentTransform();
+        renderFitReport(data.selected, data.sizing);
+        setStatus(`Wearing ${gt} Size ${activeSize} (${data.selected.fit_score}/100)`, 'ok');
+      });
+    }
+
+    document.getElementById('tryGarment').onchange = loadSizingChart;
+    document.getElementById('tryPref').onchange = loadSizingChart;
+    document.getElementById('tryView').onchange = () => { if (activeSize) dressCurrent(activeSize); };
+    document.getElementById('tryDressBtn').onclick = () => dressCurrent(null);
+    document.getElementById('tryClearBtn').onclick = clearGarments;
+    const CHART_PRESETS = {
+      default: { gt: null, type: 'garment', unit: 'in', txt: '' },
+      myntra_tee: { gt: 'tshirt', type: 'garment', unit: 'in', txt: 'size,chest,length\nS,38,26.5\nM,40,27.5\nL,42,28.5\nXL,44,29.5' },
+      fk_shirt: { gt: 'shirt', type: 'body', unit: 'in', txt: 'size,chest,shoulder,length\nS,36,16.5,28\nM,38,17.2,29\nL,40,18,30\nXL,42,18.8,31' },
+      zara_jeans: { gt: 'trousers', type: 'garment', unit: 'in', txt: 'size,waist,inseam\n28,29,30\n30,31,30.5\n32,33,31\n34,35,31.5' }
+    };
+    document.getElementById('applyChartBtn').onclick = loadSizingChart;
+    async function spawnPreset(g, hCm) {
+      setStatus(`Spawning ${g} mannequin...`, 'info');
+      const fd = new FormData(); fd.append('gender', g); fd.append('height_cm', String(hCm));
+      const res = await fetch('/avatars/preset', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) { setStatus(data.detail || 'Preset failed', 'err'); return; }
+      clearGarments(); currentAvatarId = data.avatar_id;
+      updateMeasurementsUI(data.avatar_id, data.measurements);
+      await loadGlb(data.avatar_id, { resetCamera: true, keepPreviousAsGhost: false });
+      await loadSizingChart();
+      setStatus(`Ready: ${g} preset (${data.avatar_id})`, 'ok');
+    }
+    document.getElementById('presetFemBtn').onclick = () => spawnPreset('female', 162.5);
+    document.getElementById('presetMaleBtn').onclick = () => spawnPreset('male', 173.0);
+    document.querySelectorAll('#storeChartBox [data-pre]').forEach(b => b.onclick = () => {
+      const pr = CHART_PRESETS[b.dataset.pre];
+      if (pr.gt) document.getElementById('tryGarment').value = pr.gt;
+      document.getElementById('chartType').value = pr.type;
+      document.getElementById('chartUnit').value = pr.unit;
+      document.getElementById('customChartText').value = pr.txt;
+      loadSizingChart();
+    });
+    document.querySelectorAll('#trySwatches .sw').forEach(el => {
+      el.onclick = () => {
+        document.querySelectorAll('#trySwatches .sw').forEach(s => s.classList.remove('active'));
+        el.classList.add('active');
+        tryColor = el.dataset.c;
+        if (activeSize && document.getElementById('tryView').value === 'fabric') dressCurrent(activeSize);
+      };
+    });
+    document.addEventListener('click', e => {
+      if (e.target && e.target.textContent && e.target.textContent.startsWith('Wireframe:')) {
+        garmentsGroup.traverse(o => { if (o.isMesh && o.material) o.material.wireframe = wireframeOn; });
+      }
+    });
+    setInterval(() => {
+      if (currentAvatarId && currentAvatarId !== lastTryId) {
+        lastTryId = currentAvatarId; clearGarments(); loadSizingChart();
+      }
+    }, 600);
+
+  </script>
+</body>
+</html>
