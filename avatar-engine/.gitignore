@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.pkl
+*.npz
+fashn-vton-1.5/weights/
+avatars_out/
+tmp/
+.env
+outputs/
+checkpoints/
