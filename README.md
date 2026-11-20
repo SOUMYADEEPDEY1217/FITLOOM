@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="assets/fitloom-banner.svg" alt="FITLOOM — AI Fashion Intelligence &amp; Fit Calibration" width="100%" />
+  <img src="assets/fitloom-banner.svg" alt="FITLOOM – AI Fashion Intelligence & Fit Calibration" width="100%" />
 </p>
 
 <h1 align="center">FITLOOM</h1>
 
 <p align="center">
-  <strong>AI Fashion Intelligence &amp; Fit Calibration Platform</strong><br />
+  <strong>AI Fashion Intelligence & Fit Calibration Platform</strong><br />
   <em>Find Your Fit. Define Your Style.</em>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Hackathon-Hack%20N%20Pitch%20%7C%20E--Summit%20'26-5B3A4A?style=for-the-badge" alt="Hack N Pitch — E-Summit '26" />
+  <img src="https://img.shields.io/badge/Hackathon-Hack%20N%20Pitch%20%7C%20E--Summit%20'26-5B3A4A?style=for-the-badge" alt="Hack N Pitch – E-Summit '26" />
   <img src="https://img.shields.io/badge/Team-PARADOX-4E354F?style=for-the-badge" alt="Team PARADOX" />
   <img src="https://img.shields.io/badge/Platform-Fashion%20Tech-D2B3A7?style=for-the-badge" alt="Fashion Tech" />
 </p>
@@ -68,12 +68,10 @@ FITLOOM connects a shopper's body profile, garment information, fit preferences,
 
 Create a structured body profile with measurements such as:
 
-- Height &amp; weight
-- Chest
-- Waist
-- Hips
+- Height & weight
+- Chest, Waist, Hips
 - Shoulder width
-- Sleeve &amp; inseam length
+- Sleeve & inseam length
 - Preferred fit and ease (`slim`, `regular`, `relaxed`, `oversized`)
 
 The interface supports centimetre/inch (`cm` / `in`) measurement units, Smart Estimate helpers, and guided measurement entry. Input validation is handled with Zod.
@@ -92,8 +90,6 @@ It provides:
 - Tight, ideal, or loose fit observations (`Snug`, `Good fit`, `Slightly loose`)
 - Fit context informed by garment dimensions, cut, fabric behaviour, and the shopper's preferred ease
 
-The goal is to make recommendations understandable—not just return a size label without explaining the result.
-
 ### 3. AI-Assisted Virtual Try-On
 
 The Virtual Try-On experience is designed to help shoppers visually explore how an outfit may look on them:
@@ -103,14 +99,14 @@ The Virtual Try-On experience is designed to help shoppers visually explore how 
 - Preview experience with clear demo-state disclosure
 - Architecture intended to support an IDM-VTON-based inference integration
 
-**Prototype transparency:** the current repository includes a simulated preview workflow. It does not claim that live AI inference is running in the current demo. Mock previews are not presented as verified AI-generated try-on results.
+**Prototype transparency:** the current repository includes a simulated preview workflow. It does not claim that live AI inference is running in the current demo.
 
 ### 4. Fashion Discovery & Customer Marketplace
 
 Explore a fashion catalogue through an authenticated Marketplace experience (`/shop`) with an on-demand left navigation drawer:
 
 - Product catalogue and protected product detail pages (`/shop/[id]`)
-- Live search, category filters (`Shirts`, `Outerwear`, `Trousers`, `T-Shirts`), and fit-type filters (`Slim`, `Regular`, `Relaxed`)
+- Live search, category filters (`Shirts`, `Outerwear`, `Trousers`, `T-Shirts`), and fit-type filters
 - Garment specifications and size-chart presentation
 - Side-by-side product comparison (`/compare`)
 - Wishlist and saved-product interactions
@@ -135,8 +131,6 @@ FITLOOM extends the shopping journey towards made-to-measure fashion and partner
 
 ### 7. Customer Shopping & Authentication Experience
 
-The prototype also brings together supporting shopping and access-control journeys:
-
 - Split-screen 3D animated `/login` and `/signup` pages with `?next=` destination preservation
 - Route-level access protection (`AuthRouteGuard`) restricting product details, cart, wishlist, and workspaces to authenticated sessions
 - Separate Customer Dashboard (`/dashboard`), Cart, Checkout, and Order Timeline (`/orders`, `/orders/[id]`)
@@ -154,13 +148,403 @@ The prototype also brings together supporting shopping and access-control journe
 | Offers generic product discovery | Connects discovery with personal fit preferences and saved outfits |
 | Treats customization as a separate journey | Connects fit needs to a CUSTOMFIT and tailor workflow |
 
-**FITLOOM is not just a virtual try-on concept.** Its product direction combines visual exploration with a separate, explainable fit-intelligence layer. A visual preview and a measurement-based fit recommendation serve different purposes, and the platform is designed to make that distinction clear.
+---
+
+## Frontend Visual Architecture
+
+### Application Shell & Rendering Model
+
+The application uses **Next.js 15 App Router** with two distinct rendering shells that wrap every authenticated route and workspace.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    RootLayout (layout.tsx)                   │
+│         LenisProvider  ·  FitloomProvider (global state)    │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │                   AuthRouteGuard                       │  │
+│  │  ┌──────────────────────┐  ┌────────────────────────┐  │  │
+│  │  │   Landing Shell      │  │  Customer App Shell    │  │  │
+│  │  │  HeroNavbar          │  │  Navbar + Sidebar      │  │  │
+│  │  │  FitloomHero         │  │  customer-app-shell    │  │  │
+│  │  │  Home sections       │  │  /shop  /dashboard     │  │  │
+│  │  │  Footer              │  │  /cart  /fit-check …   │  │  │
+│  │  └──────────────────────┘  └────────────────────────┘  │  │
+│  │  ┌──────────────────────┐  ┌────────────────────────┐  │  │
+│  │  │   Auth Shell         │  │  Workspace Shell       │  │  │
+│  │  │  AuthSplitShowcase   │  │  WorkspaceShell        │  │  │
+│  │  │  /login  /signup     │  │  WorkspaceSubnav       │  │  │
+│  │  │  /auth/*             │  │  /seller  /tailor      │  │  │
+│  │  └──────────────────────┘  │  /admin                │  │  │
+│  │                            └────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Page Route Map (42 Pages)
+
+```
+src/app/
+│
+├── page.tsx                         /           ← Landing page
+│
+├── shop/
+│   ├── page.tsx                     /shop        ← Product catalogue (public list)
+│   └── [id]/page.tsx                /shop/[id]   ← Product detail (auth required)
+│
+├── body-profile/page.tsx            /body-profile
+├── fit-check/page.tsx               /fit-check
+├── try-on/page.tsx                  /try-on
+├── studio/page.tsx                  /studio
+├── customfit/page.tsx               /customfit
+├── saved-looks/page.tsx             /saved-looks
+├── compare/page.tsx                 /compare
+├── wishlist/page.tsx                /wishlist
+│
+├── dashboard/page.tsx               /dashboard
+├── cart/page.tsx                    /cart
+├── checkout/page.tsx                /checkout
+├── account/page.tsx                 /account
+├── orders/
+│   ├── page.tsx                     /orders
+│   └── [id]/page.tsx                /orders/[id]
+│
+├── login/page.tsx                   /login       ← Legacy login
+├── signup/page.tsx                  /signup      ← Legacy signup
+├── auth/
+│   ├── login/page.tsx               /auth/login
+│   ├── register/page.tsx            /auth/register
+│   └── forgot-password/page.tsx     /auth/forgot-password
+│
+├── seller/
+│   ├── page.tsx                     /seller
+│   ├── products/page.tsx            /seller/products
+│   └── orders/page.tsx              /seller/orders
+│
+├── tailor/
+│   ├── page.tsx                     /tailor
+│   ├── register/page.tsx            /tailor/register  ← Public
+│   ├── orders/
+│   │   ├── page.tsx                 /tailor/orders
+│   │   └── [id]/page.tsx            /tailor/orders/[id]
+│   └── profile/page.tsx             /tailor/profile
+│
+├── admin/
+│   ├── page.tsx                     /admin
+│   ├── catalogue/page.tsx           /admin/catalogue
+│   ├── orders/page.tsx              /admin/orders
+│   └── partners/page.tsx            /admin/partners
+│
+├── about/page.tsx                   /about
+├── how-it-works/page.tsx            /how-it-works
+├── faq/page.tsx                     /faq
+├── contact/page.tsx                 /contact
+├── privacy/page.tsx                 /privacy
+├── terms/page.tsx                   /terms
+├── returns/page.tsx                 /returns
+└── shipping/page.tsx                /shipping
+```
+
+---
+
+### Role-Based Access Control (RBAC) Model
+
+Five user roles control every route, enforced client-side by `AuthRouteGuard` via `auth-routes.ts`:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         FITLOOM Role Matrix                         │
+├──────────┬──────────────────────────────────────────────────────────┤
+│  ROLE    │  ACCESSIBLE ROUTE CATEGORIES                             │
+├──────────┼──────────────────────────────────────────────────────────┤
+│  guest   │  Public only: / · /shop · /login · /signup · /auth/*    │
+│          │  /about · /how-it-works · /faq · /contact · /privacy    │
+│          │  /terms · /returns · /shipping · /tailor/register        │
+├──────────┼──────────────────────────────────────────────────────────┤
+│ customer │  Public  +  Customer hub: /dashboard · /account          │
+│          │  /body-profile · /fit-check · /try-on · /studio          │
+│          │  /customfit · /cart · /checkout · /wishlist · /compare   │
+│          │  /saved-looks · /orders · /orders/[id] · /shop/[id]      │
+├──────────┼──────────────────────────────────────────────────────────┤
+│  seller  │  Public  +  Customer hub  +  Seller workspace:           │
+│          │  /seller · /seller/products · /seller/orders             │
+├──────────┼──────────────────────────────────────────────────────────┤
+│  tailor  │  Public  +  Customer hub  +  Tailor workspace:           │
+│          │  /tailor · /tailor/orders · /tailor/orders/[id]          │
+│          │  /tailor/profile                                          │
+├──────────┼──────────────────────────────────────────────────────────┤
+│  admin   │  ALL routes — full platform oversight                     │
+└──────────┴──────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Component Architecture
+
+```
+src/components/
+│
+├── providers/                 Global runtime providers
+│   ├── fitloom-provider.tsx   FitloomContext — in-memory state (role, cart, wishlist…)
+│   └── lenis-provider.tsx     Smooth scroll (Lenis)
+│
+├── auth/                      Authentication UI
+│   ├── AuthRouteGuard.tsx     Route protection — reads role, redirects unauthorised
+│   ├── AuthShell.tsx          Wrapper for auth form pages
+│   ├── AuthSplitShowcase.tsx  Split-screen animated login/signup layout
+│   └── PasswordInput.tsx      Reusable password field with reveal toggle
+│
+├── hero/                      Landing page hero section
+│   ├── FitloomHero.tsx        Root hero orchestrator (GSAP scroll-driven)
+│   ├── HeroNavbar.tsx         Landing-only transparent nav
+│   ├── BrandBackdrop.tsx      Parallax editorial background
+│   ├── HeroContent.tsx        Headline, tagline, CTA block
+│   ├── HeroActions.tsx        Primary/secondary CTA buttons
+│   ├── HeroModels.tsx         Fashion model imagery
+│   ├── HeroFeatureStrip.tsx   Feature pills strip
+│   └── OutfitSelector.tsx     Interactive outfit picker overlay
+│
+├── home/                      Home page marketing sections
+│   ├── BrandIntroSection.tsx
+│   ├── FitIntelligenceSection.tsx
+│   ├── BodyProfileSection.tsx
+│   ├── VirtualTryOnSection.tsx
+│   ├── DiscoveryCarouselSection.tsx
+│   ├── CustomFitSection.tsx
+│   ├── HowItWorksSection.tsx
+│   ├── TrustVerificationSection.tsx
+│   ├── FaqPreviewSection.tsx
+│   └── FinalCtaSection.tsx
+│
+├── layout/                    Persistent shell & navigation
+│   ├── main-shell.tsx         Root layout wrapper
+│   ├── navbar.tsx             Authenticated top navigation bar
+│   ├── customer-app-shell.tsx Sidebar + content area for customer routes
+│   ├── footer.tsx             Global footer
+│   ├── nav-config.ts          Navigation link configuration
+│   ├── mobile-nav-drawer.tsx  Slide-out mobile nav (authenticated)
+│   ├── landing-mobile-drawer.tsx  Landing page mobile menu
+│   └── cookie-banner.tsx      GDPR-style cookie consent banner
+│
+├── body-profile/
+│   └── DigitalAvatarPreview.tsx  Measurement avatar visualisation
+│
+├── shop/
+│   └── ProductCard.tsx        Reusable product listing card
+│
+├── workspace/                 Shared partner workspace primitives
+│   ├── WorkspaceShell.tsx     Workspace page container
+│   ├── WorkspaceSubnav.tsx    Workspace-level navigation tabs
+│   ├── WorkspaceRoleGuard.tsx Role enforcement within workspace
+│   ├── WorkspaceConfirmDialog.tsx Destructive action confirmation modal
+│   └── WorkspaceAccessDenied.tsx  403 denial screen
+│
+├── public/                    Reusable public page components
+│   ├── PublicPageHero.tsx     Shared hero for informational pages
+│   ├── PolicyPageLayout.tsx   Legal/policy page wrapper
+│   ├── TrustTransparencySection.tsx  Trust signals block
+│   └── OpenCookieSettingsButton.tsx  Cookie settings trigger
+│
+└── ui/                        Design-system primitives (shadcn-style)
+    ├── button.tsx
+    ├── badge.tsx
+    ├── card.tsx
+    ├── input.tsx
+    ├── tabs.tsx
+    ├── toast.tsx
+    └── segmented-control.tsx
+```
+
+---
+
+### Data & State Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     FitloomProvider                          │
+│               (React Context — in-memory state)              │
+│                                                              │
+│  mockRole: guest | customer | seller | tailor | admin        │
+│  cart: CartItem[]          wishlist: Product[]               │
+│  bodyProfile: Measurements savedLooks: Outfit[]              │
+│  fitCheckResult: FitResult orders: Order[]                   │
+│  customfitRequest: Request notifications: Notification[]     │
+└──────────────┬───────────────────────────────────────────────┘
+               │  consumed by any client component via useContext
+               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                      Utility Libraries  (src/lib/)           │
+├─────────────────────────┬────────────────────────────────────┤
+│  auth-routes.ts         │  Route classification & RBAC logic │
+│  workspace-config.ts    │  Workspace definitions (nav, roles)│
+│  mock-data.ts           │  Products, orders, users (fixtures)│
+│  shop-utils.ts          │  Filter, search, sort helpers      │
+│  fit-intelligence-utils │  Fit scoring & zone verdict logic  │
+│  body-profile-utils     │  Measurement conversion & validate │
+│  checkout-utils         │  Cart totals & order assembly      │
+│  studio-utils           │  Outfit combination helpers        │
+│  customfit-utils        │  CUSTOMFIT request builders        │
+│  compare-wishlist-utils │  Product comparison helpers        │
+│  seller-workspace-utils │  Seller dashboard helpers          │
+│  tailor-workspace-utils │  Tailor order & stage helpers      │
+│  admin-workspace-utils  │  Admin oversight helpers           │
+│  public-pages-utils     │  Informational page content        │
+│  route-metadata.ts      │  Page titles & SEO metadata        │
+│  utils.ts               │  cn() and shared utilities         │
+└─────────────────────────┴────────────────────────────────────┘
+               │
+               │  mock data (no live DB in prototype)
+               ▼
+┌──────────────────────────────────────────────────────────────┐
+│               Planned Production Data Layer                  │
+│  Neon PostgreSQL  ·  Drizzle ORM  ·  Better Auth            │
+│         Next.js Route Handlers  ·  Server Actions            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### High-Level System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client["Browser — Next.js 15 App Router"]
+        LP["Landing Page\n/ (page.tsx)"]
+        AUTH["Auth Pages\n/login · /signup · /auth/*"]
+        CUST["Customer Experience\n/shop · /dashboard · /cart\n/body-profile · /fit-check\n/try-on · /studio · /customfit"]
+        WS["Partner Workspaces\n/seller* · /tailor* · /admin*"]
+        PUB["Public Pages\n/about · /faq · /how-it-works\n/privacy · /terms · …"]
+    end
+
+    subgraph Providers["Global Providers (layout.tsx)"]
+        FP["FitloomProvider\nIn-memory state"]
+        LP2["LenisProvider\nSmooth scroll"]
+        ARG["AuthRouteGuard\nRBAC enforcement"]
+    end
+
+    subgraph LibLayer["src/lib/ — Utility & Logic Layer"]
+        AR["auth-routes.ts"]
+        WC["workspace-config.ts"]
+        MD["mock-data.ts"]
+        FI["fit-intelligence-utils.ts"]
+        SH["shop-utils.ts"]
+    end
+
+    subgraph PlannedBackend["Planned Backend (not yet connected)"]
+        RH["Next.js Route Handlers\n& Server Actions"]
+        DB[("Neon PostgreSQL\n+ Drizzle ORM")]
+        BA["Better Auth\nSession management"]
+        AI["IDM-VTON\nVirtual try-on inference"]
+    end
+
+    Client --> Providers
+    Providers --> LibLayer
+    LibLayer --> MD
+
+    CUST -. "Intended" .-> RH
+    WS -. "Intended" .-> RH
+    RH -. "Intended" .-> DB
+    RH -. "Intended" .-> BA
+    CUST -. "Intended AI" .-> AI
+```
+
+---
+
+### Landing Page Composition
+
+The home page (`/`) is composed of layered sections assembled in `page.tsx`:
+
+```mermaid
+flowchart TD
+    ROOT["page.tsx (/)"]
+    ROOT --> H["FitloomHero\n(GSAP scroll-driven)"]
+    ROOT --> BI["BrandIntroSection"]
+    ROOT --> FIS["FitIntelligenceSection"]
+    ROOT --> BP["BodyProfileSection"]
+    ROOT --> VTO["VirtualTryOnSection"]
+    ROOT --> DC["DiscoveryCarouselSection"]
+    ROOT --> CF["CustomFitSection"]
+    ROOT --> HIW["HowItWorksSection"]
+    ROOT --> TV["TrustVerificationSection"]
+    ROOT --> FAQ["FaqPreviewSection"]
+    ROOT --> CTA["FinalCtaSection"]
+
+    H --> HN["HeroNavbar"]
+    H --> BB["BrandBackdrop"]
+    H --> HC["HeroContent"]
+    H --> HA["HeroActions"]
+    H --> HM["HeroModels"]
+    H --> HFS["HeroFeatureStrip"]
+    H --> OS["OutfitSelector"]
+```
+
+---
+
+### User Journey Flow
+
+```mermaid
+flowchart LR
+    GUEST["Guest\nVisitor"]
+    GUEST -->|browse| LAND["Landing /"]
+    GUEST -->|sign up| AUTH["Auth Flow\n/login · /signup"]
+    AUTH -->|authenticated| CUST_HUB["Customer Hub"]
+
+    CUST_HUB --> SHOP["/shop\nBrowse catalogue"]
+    CUST_HUB --> BP["/body-profile\nEnter measurements"]
+    SHOP --> PDP["/shop/[id]\nProduct detail"]
+    BP --> FC["/fit-check\nFit Intelligence"]
+    FC --> TRY["/try-on\nVirtual Try-On"]
+    TRY --> STU["/studio\nStyle Studio"]
+    STU --> SL["/saved-looks\nSaved outfits"]
+    PDP --> CART["/cart"]
+    CART --> CHK["/checkout"]
+    CHK --> ORD["/orders/[id]\nOrder timeline"]
+    PDP --> CF["/customfit\nMade-to-measure"]
+    CF -->|routed to| TW["Tailor Workspace\n/tailor/orders/[id]"]
+
+    GUEST -->|partner sign-up| TR["/tailor/register"]
+    TR -->|approved| TW
+
+    AUTH -->|seller login| SW["Seller Workspace\n/seller"]
+    AUTH -->|admin login| AW["Admin Workspace\n/admin"]
+```
+
+---
+
+### Technology Stack
+
+#### Frontend (live in prototype)
+
+| Technology | Version | Purpose |
+| --- | --- | --- |
+| [Next.js](https://nextjs.org/) | 15 | App Router, SSR/RSC framework |
+| [React](https://react.dev/) | 19 | Component model |
+| [TypeScript](https://www.typescriptlang.org/) | 5.7 | Type safety |
+| [Tailwind CSS](https://tailwindcss.com/) | 4 | Utility-first styling |
+| [GSAP](https://gsap.com/) | 3.12 | Scroll-driven animation (hero) |
+| [Lenis](https://lenis.darkroom.engineering/) | 1.1 | Smooth inertia scrolling |
+| [Lucide React](https://lucide.dev/) | — | Icon system |
+| [Zod](https://zod.dev/) | 3.24 | Schema & form validation |
+| [class-variance-authority](https://cva.style/) | 0.7 | Component variant API |
+| [clsx](https://github.com/lukeed/clsx) + [tailwind-merge](https://github.com/dcastil/tailwind-merge) | — | Conflict-free utility classes |
+
+#### Planned Service Integrations (not yet connected)
+
+| Technology | Intended purpose |
+| --- | --- |
+| Next.js Route Handlers & Server Actions | Application APIs and server-side operations |
+| [Neon PostgreSQL](https://neon.tech/) | Managed relational database |
+| [Drizzle ORM](https://orm.drizzle.team/) | Type-safe database layer |
+| [Better Auth](https://www.better-auth.com/) | Authentication & session management |
+| IDM-VTON | Virtual try-on inference engine |
+| [Vercel](https://vercel.com/) | Hosting & deployment |
 
 ---
 
 ## Application Routes
 
-The current frontend contains **42 App Router pages**. The routes below describe the available prototype interface; interactive data is currently driven by local mock data and in-memory React state.
+The current frontend contains **42 App Router pages**:
 
 | Area | Routes |
 | --- | --- |
@@ -176,76 +560,106 @@ The current frontend contains **42 App Router pages**. The routes below describe
 
 ---
 
-## Technology Stack
-
-### Frontend
-
-| Technology | Purpose |
-| --- | --- |
-| [Next.js 15](https://nextjs.org/) | App Router and application framework |
-| [React 19](https://react.dev/) | Component-based user interface |
-| [TypeScript](https://www.typescriptlang.org/) | Type-safe application development |
-| [Tailwind CSS 4](https://tailwindcss.com/) | Utility-first styling |
-| [GSAP](https://gsap.com/) | Interface animation and motion |
-| [Lenis](https://lenis.darkroom.engineering/) | Smooth scrolling |
-| [Lucide React](https://lucide.dev/) | Interface icons |
-| [Zod](https://zod.dev/) | Schema and form validation |
-| [class-variance-authority](https://cva.style/) | Component variants |
-| [clsx](https://github.com/lukeed/clsx) &amp; [tailwind-merge](https://github.com/dcastil/tailwind-merge) | Conditional and conflict-free utility classes |
-
-### Planned Service Integrations
-
-The following technologies represent the intended full-product architecture; they are **not currently connected as live services in this frontend prototype**.
-
-| Technology | Intended purpose |
-| --- | --- |
-| Next.js Route Handlers &amp; Server Actions | Application APIs and server-side operations |
-| [Neon PostgreSQL](https://neon.tech/) | Managed relational database |
-| [Drizzle ORM](https://orm.drizzle.team/) | Type-safe database access |
-| [Better Auth](https://www.better-auth.com/) | Authentication and session management |
-| IDM-VTON | Virtual try-on inference integration; provider and deployment approach to be evaluated |
-| [Vercel](https://vercel.com/) | Application hosting and deployment |
-
----
-
-## High-Level Architecture
-
-The current prototype is a Next.js frontend using local mock datasets and in-memory React state. The intended product architecture connects this experience to persistent services and AI inference.
-
-```mermaid
-flowchart TD
-    A["FITLOOM Web Application"] --> B["Customer Experience"]
-    A --> C["Partner &amp; Admin Workspaces"]
-
-    B --> D["Body Profile"]
-    B --> E["Fit Intelligence"]
-    B --> F["Virtual Try-On"]
-    B --> G["Marketplace &amp; Style Studio"]
-    B --> H["CUSTOMFIT &amp; Shopping"]
-
-    D --> I["Fit &amp; Personalization Layer"]
-    E --> I
-    G --> I
-    H --> J["Order &amp; Customization Workflow"]
-    C --> J
-
-    I -. "Intended service integration" .-> K[("PostgreSQL Database")]
-    F -. "Intended AI integration" .-> L["IDM-VTON Inference"]
-    J -. "Intended service integration" .-> K
-```
-
-### Current Prototype Status
+## Current Prototype Status
 
 To keep the project transparent, the current implementation should be understood as a **frontend prototype**, not a fully deployed production platform:
 
 - The 42-page Next.js interface is implemented in the repository.
-- Product, account, order, and other demonstration data are supplied through local mock fixtures.
+- Product, account, order, and other demonstration data are supplied through local mock fixtures (`src/lib/mock-data.ts`).
 - `FitloomProvider` manages client-side in-memory state for the demo experience.
 - `AuthRouteGuard` enforces client-side route boundaries across guest, customer, seller, tailor, and admin demo roles.
 - Zod is used for relevant data and form validation.
 - Persistent database storage, production authentication, live backend APIs, and live IDM-VTON inference are not yet connected.
 
 This distinction is intentional: the interface demonstrates the product journey while planned integrations remain clearly identified as future engineering work.
+
+---
+
+## Repository Structure
+
+```text
+FITLOOM/
+├── assets/
+│   └── fitloom-banner.svg
+├── docs/
+│   ├── AI_AND_FIT_SPEC.md
+│   ├── DB_AND_API_CONTRACTS.md
+│   ├── PRD.md
+│   ├── QA_DEPLOY_GUIDELINES.md
+│   ├── REQUIREMENTS.md
+│   ├── SECURITY_PRIVACY_STORAGE.md
+│   ├── SYSTEM_ARCHITECTURE.md
+│   └── UX_IA_SPEC.md
+├── planning/
+│   ├── DECISIONS.md
+│   ├── EXECUTION_RULES.md
+│   ├── MASTER_TRACKER_GUIDE.md
+│   ├── PHASE_APPROVAL_CHECKLIST.md
+│   ├── PROJECT_ROADMAP.md
+│   ├── PROJECT_STATUS.md
+│   └── TEAM_RESPONSIBILITIES.md
+├── public/
+│   └── assets/
+│       ├── hero/
+│       ├── footer/
+│       └── products/
+├── src/
+│   ├── app/                  ← 42 Next.js App Router pages
+│   │   ├── page.tsx          ← Landing
+│   │   ├── shop/
+│   │   ├── body-profile/
+│   │   ├── fit-check/
+│   │   ├── try-on/
+│   │   ├── studio/
+│   │   ├── customfit/
+│   │   ├── dashboard/
+│   │   ├── cart/
+│   │   ├── checkout/
+│   │   ├── orders/
+│   │   ├── wishlist/
+│   │   ├── compare/
+│   │   ├── saved-looks/
+│   │   ├── login/
+│   │   ├── signup/
+│   │   ├── auth/
+│   │   ├── seller/
+│   │   ├── tailor/
+│   │   ├── admin/
+│   │   └── about|faq|how-it-works|contact|privacy|terms|…
+│   ├── components/           ← UI component library
+│   │   ├── auth/
+│   │   ├── hero/
+│   │   ├── home/
+│   │   ├── layout/
+│   │   ├── providers/
+│   │   ├── body-profile/
+│   │   ├── shop/
+│   │   ├── workspace/
+│   │   ├── public/
+│   │   └── ui/
+│   └── lib/                  ← Utility, logic & mock-data layer
+│       ├── auth-routes.ts
+│       ├── workspace-config.ts
+│       ├── mock-data.ts
+│       ├── fit-intelligence-utils.ts
+│       ├── body-profile-utils.ts
+│       ├── shop-utils.ts
+│       ├── studio-utils.ts
+│       ├── customfit-utils.ts
+│       ├── checkout-utils.ts
+│       ├── compare-wishlist-utils.ts
+│       ├── seller-workspace-utils.ts
+│       ├── tailor-workspace-utils.ts
+│       ├── admin-workspace-utils.ts
+│       ├── public-pages-utils.ts
+│       ├── route-metadata.ts
+│       └── utils.ts
+├── next.config.ts
+├── components.json
+├── tsconfig.json
+├── package.json
+└── README.md
+```
 
 ---
 
@@ -287,56 +701,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `npm run build` | Create a production build |
 | `npm run start` | Start the production server |
 
-**Environment variables:** the current frontend prototype does not require database credentials, authentication secrets, or AI provider API keys to run.
-
----
-
-## Repository Structure
-
-```text
-FITLOOM/
-├── assets/
-│   └── fitloom-banner.svg
-├── docs/
-├── planning/
-├── public/
-│   └── assets/
-│       ├── hero/
-│       ├── footer/
-│       └── products/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx
-│   │   ├── shop/
-│   │   ├── body-profile/
-│   │   ├── fit-check/
-│   │   ├── try-on/
-│   │   ├── studio/
-│   │   ├── customfit/
-│   │   ├── dashboard/
-│   │   ├── login/
-│   │   ├── signup/
-│   │   ├── seller/
-│   │   ├── tailor/
-│   │   ├── admin/
-│   │   └── ...
-│   ├── components/
-│   │   ├── auth/
-│   │   ├── hero/
-│   │   ├── home/
-│   │   ├── layout/
-│   │   ├── providers/
-│   │   ├── shop/
-│   │   └── ui/
-│   └── lib/
-│       ├── auth-routes.ts
-│       ├── mock-data.ts
-│       ├── shop-utils.ts
-│       └── utils.ts
-├── next.config.ts
-├── package.json
-└── README.md
-```
+> **Environment variables:** the current frontend prototype does not require database credentials, authentication secrets, or AI provider API keys to run.
 
 ---
 
