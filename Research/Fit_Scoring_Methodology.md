@@ -1,9 +1,9 @@
 # FITLOOM — Fit Scoring Methodology & Deterministic Calibration Engine
 
 **Document Reference:** `FL-METH-SCORING-001`  
-**Governing Module:** Fit Intelligence Engine (`src/lib/fit-intelligence-utils.ts`, `docs/AI_AND_FIT_SPEC.md`)  
+**Governing Module:** Fit Intelligence Engine (`frontend/src/lib/fit-intelligence-utils.ts`, `docs/AI_AND_FIT_SPEC.md`)  
 **Repository Path:** `Research/Fit_Scoring_Methodology.md`  
-**Prerequisite Specification:** [`Research/measurement_Schema.md`](file:///c:/Users/soumy/OneDrive/Desktop/FITLOOM/Research/measurement_Schema.md)  
+**Prerequisite Specification:** [`Research/measurement_Schema.md`](./measurement_Schema.md)  
 **Author / Engineering Lead:** Soumyadeep Dey (`TM-002`)  
 **Project:** FITLOOM (Hack N Pitch — E-Summit '26, Jadavpur University)  
 **Status:** Canonical Engineering Specification (`FIT_SCORING_METHODOLOGY.md`)

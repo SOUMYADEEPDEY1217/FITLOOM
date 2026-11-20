@@ -64,7 +64,7 @@ erDiagram
 
 ## 3. Core Drizzle Relational Schema Blueprint (`BE-002`)
 
-| Table | Key Columns (Aligned to `src/lib/*` & Multi-Role Option B Design) | Constraints & Notes |
+| Table | Key Columns (Aligned to `frontend/src/lib/*` & Multi-Role Option B Design) | Constraints & Notes |
 | :--- | :--- | :--- |
 | **`users`** | `id (uuid pk)`, `name`, `email (unique)`, `password_hash`, `account_status ('active'\|'disabled')`, `phone`, `city`, `created_at` | Better Auth canonical user identity (`BE-003`) |
 | **`user_roles`** | `user_id (fk users)`, `role ('customer'\|'seller'\|'tailor'\|'admin')`, `granted_by (nullable fk users)`, `granted_at` | Composite PK `(user_id, role)`; enables Customer+Tailor/Seller multi-capability accounts |

@@ -2,10 +2,10 @@
 
 **Document Reference:** `FL-TEST-FIT-001`  
 **Governing Modules:**  
-- Engine Core: `src/lib/fit-intelligence-utils.ts`  
-- Input Validation: `src/lib/body-profile-utils.ts`  
-- Methodology Spec: [`Research/Fit_Scoring_Methodology.md`](file:///c:/Users/soumy/OneDrive/Desktop/FITLOOM/Research/Fit_Scoring_Methodology.md)  
-- Measurement Schema: [`Research/measurement_Schema.md`](file:///c:/Users/soumy/OneDrive/Desktop/FITLOOM/Research/measurement_Schema.md)  
+- Engine Core: `frontend/src/lib/fit-intelligence-utils.ts`  
+- Input Validation: `frontend/src/lib/body-profile-utils.ts`  
+- Methodology Spec: [`Research/Fit_Scoring_Methodology.md`](./Fit_Scoring_Methodology.md)  
+- Measurement Schema: [`Research/measurement_Schema.md`](./measurement_Schema.md)  
 **Repository Path:** `Research/Test_Cases.md`  
 **Author / Engineering Lead:** Soumyadeep Dey (`TM-002`)  
 **Project:** FITLOOM (Hack N Pitch — E-Summit '26, Jadavpur University)  
@@ -242,7 +242,7 @@ export const FIXTURE_TSHIRT_NO_WAIST = {
 
 ## 4. Automated Jest / Vitest Implementation Snippet
 
-Below is the ready-to-execute test suite implementation for `src/__tests__/fit-intelligence.test.ts`:
+Below is the ready-to-execute test suite implementation for `frontend/src/__tests__/fit-intelligence.test.ts`:
 
 ```typescript
 import { describe, it, expect } from "vitest";
@@ -321,7 +321,7 @@ describe("FITLOOM Fit Intelligence Engine — Deterministic Calibration", () => 
 
 ## 5. Test Pass Criteria & Quality Checklist
 
-Before deploying any modifications to `src/lib/fit-intelligence-utils.ts` or `src/app/api/fit-check`:
+Before deploying any modifications to `frontend/src/lib/fit-intelligence-utils.ts` or `frontend/src/app/api/fit-check`:
 - [x] **100% Invariance:** All 12 test cases in Categories 1–5 pass without error.
 - [x] **Zero Negative Ease:** No recommended size ever exhibits $E_p < 0$ or $E_q < 0$.
 - [x] **Honest Nullability:** All missing data paths return `recommendedSize: null` and audited error reasons.

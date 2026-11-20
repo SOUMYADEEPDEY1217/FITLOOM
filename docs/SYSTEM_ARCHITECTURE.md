@@ -38,26 +38,26 @@ flowchart TD
 
 ---
 
-## 2. Current Frontend Architecture (`src/` Source of Truth)
+## 2. Current Frontend Architecture (`frontend/src/` Source of Truth)
 
 ### 2.1 Global Shell & Visual System
-- **Root Layout (`src/app/layout.tsx`) & `MainShell` (`src/components/layout/main-shell.tsx`):**
+- **Root Layout (`frontend/src/app/layout.tsx`) & `MainShell` (`frontend/src/components/layout/main-shell.tsx`):**
   - Wraps app in `LenisProvider`, `FitloomProvider`, `RadialBackground` (`DEC-003`), route-aware `Navbar` (delegates `/` to `HeroNavbar`), `<main>`, approved Futuristic `Footer` (`DEC-004`), `CookieConsentBanner`, and `ToastViewport`.
-  - SEO metadata template `"%s | FITLOOM"` + `/icon.svg`, complemented by `33` route `layout.tsx` metadata wrappers, `7` server `page.tsx` metadata exports, `src/lib/route-metadata.ts`, [not-found.tsx](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/app/not-found.tsx), and [error.tsx](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/app/error.tsx).
-- **Locked Showcase Layers (`DEC-004`):** `src/components/hero/*` (`HeroNavbar`, `HeroModels`, `BrandBackdrop`, `OutfitSelector`, `HeroContent`, `HeroFeatureStrip`) and `src/components/layout/footer.tsx`.
+  - SEO metadata template `"%s | FITLOOM"` + `/icon.svg`, complemented by `33` route `layout.tsx` metadata wrappers, `7` server `page.tsx` metadata exports, `frontend/src/lib/route-metadata.ts`, [not-found.tsx](../frontend/frontend/src/app/not-found.tsx), and [error.tsx](../frontend/frontend/src/app/error.tsx).
+- **Locked Showcase Layers (`DEC-004`):** `frontend/src/components/hero/*` (`HeroNavbar`, `HeroModels`, `BrandBackdrop`, `OutfitSelector`, `HeroContent`, `HeroFeatureStrip`) and `frontend/src/components/layout/footer.tsx`.
 
-### 2.2 Pure Domain Modules (`src/lib/*`)
-Every critical business invariant is isolated in pure TypeScript helpers + Zod schemas under `src/lib/` so P3 backend route handlers can import or mirror exact rules cleanly:
-- [mock-data.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/mock-data.ts): Core domain entities (`BodyProfileSchema`, `FitPreferenceSchema`, `FIT_PREFERENCE_EASE_CM`, `MOCK_GARMENTS`, `MOCK_TAILORS`).
-- [fit-intelligence-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/fit-intelligence-utils.ts): Pure `evaluateGarmentFit` size calibration & zone breakdown.
-- [body-profile-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/body-profile-utils.ts): `cm`/`in` conversion, draft validation, Smart Estimate.
-- [checkout-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/checkout-utils.ts): `validateCartItems`, `CheckoutCustomerSchema`, `buildValidatedMockOrder`.
-- [customfit-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/customfit-utils.ts): Garment eligibility, adjustment options, quote lifecycle state machine.
-- [seller-workspace-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/seller-workspace-utils.ts), [tailor-workspace-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/tailor-workspace-utils.ts), [admin-workspace-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/admin-workspace-utils.ts): Pure state-transition validators, partner suspension logic, catalogue visibility adapter (`selectEligibleCustomerGarments`), and KPI computations.
-- [workspace-config.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/workspace-config.ts): Dedicated workspace routes & `evaluateWorkspaceAccess`.
+### 2.2 Pure Domain Modules (`frontend/src/lib/*`)
+Every critical business invariant is isolated in pure TypeScript helpers + Zod schemas under `frontend/src/lib/` so P3 backend route handlers can import or mirror exact rules cleanly:
+- [mock-data.ts](../frontend/frontend/src/lib/mock-data.ts): Core domain entities (`BodyProfileSchema`, `FitPreferenceSchema`, `FIT_PREFERENCE_EASE_CM`, `MOCK_GARMENTS`, `MOCK_TAILORS`).
+- [fit-intelligence-utils.ts](../frontend/frontend/src/lib/fit-intelligence-utils.ts): Pure `evaluateGarmentFit` size calibration & zone breakdown.
+- [body-profile-utils.ts](../frontend/frontend/src/lib/body-profile-utils.ts): `cm`/`in` conversion, draft validation, Smart Estimate.
+- [checkout-utils.ts](../frontend/frontend/src/lib/checkout-utils.ts): `validateCartItems`, `CheckoutCustomerSchema`, `buildValidatedMockOrder`.
+- [customfit-utils.ts](../frontend/frontend/src/lib/customfit-utils.ts): Garment eligibility, adjustment options, quote lifecycle state machine.
+- [seller-workspace-utils.ts](../frontend/frontend/src/lib/seller-workspace-utils.ts), [tailor-workspace-utils.ts](../frontend/frontend/src/lib/tailor-workspace-utils.ts), [admin-workspace-utils.ts](../frontend/frontend/src/lib/admin-workspace-utils.ts): Pure state-transition validators, partner suspension logic, catalogue visibility adapter (`selectEligibleCustomerGarments`), and KPI computations.
+- [workspace-config.ts](../frontend/frontend/src/lib/workspace-config.ts): Dedicated workspace routes & `evaluateWorkspaceAccess`.
 
 ### 2.3 Centralized State Store (`FitloomProvider`)
-[fitloom-provider.tsx](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/components/providers/fitloom-provider.tsx) holds reactive session memory for the **single-active demo role** (`MockRole = "guest" | "customer" | "seller" | "tailor" | "admin"` for previewing workspaces), body profile & 5-entry chest/waist `measurementHistory`, `sellerProducts` synced cleanly to `eligibleCustomerGarments`, cart, wishlist, saved looks, compare, orders, tailor workshop profile, partners, `adminAuditLog`, and accessible `ToastItem` queue.
+[fitloom-provider.tsx](../frontend/frontend/src/components/providers/fitloom-provider.tsx) holds reactive session memory for the **single-active demo role** (`MockRole = "guest" | "customer" | "seller" | "tailor" | "admin"` for previewing workspaces), body profile & 5-entry chest/waist `measurementHistory`, `sellerProducts` synced cleanly to `eligibleCustomerGarments`, cart, wishlist, saved looks, compare, orders, tailor workshop profile, partners, `adminAuditLog`, and accessible `ToastItem` queue.
 
 ---
 
@@ -80,9 +80,9 @@ To avoid locking an approved Tailor or Seller out of Customer shopping while enf
 
 ## 4. Planned Backend Architecture & Mixed-Cart Fulfillment (`P3` & `P4` — Not Yet Built)
 
-### 4.1 API Route Layers (`src/app/api/**`)
+### 4.1 API Route Layers (`frontend/src/app/api/**`)
 Following `DEC-002` and `DEC-006`:
-1. **Transport & Parsing Layer:** Route Handlers parse JSON/multipart payloads and run canonical **Zod schemas** matching `src/lib/*`. Invalid requests return uniform `400 VALIDATION_ERROR`.
+1. **Transport & Parsing Layer:** Route Handlers parse JSON/multipart payloads and run canonical **Zod schemas** matching `frontend/src/lib/*`. Invalid requests return uniform `400 VALIDATION_ERROR`.
 2. **AuthN, Tailor Onboarding & Capability Guard Middleware (`BE-011`):**
    - Validates Better Auth HTTP-only session -> loads `session.capabilities` (`user_roles`) and linked `partners` rows (`owner_user_id = session.user.id`).
    - **Tailor Onboarding (`/api/tailor/register`):** Authenticated Customer submits `TailorRegistrationSchema` -> creates `partners` row (`verification_status = 'pending_review'`, duplicate `(owner_user_id, 'tailor')` returns `409`). Only Admin `PATCH /api/admin/partners/[id]` (`verify`) grants `'tailor'` capability into `user_roles` + logs `admin_audit_logs`.

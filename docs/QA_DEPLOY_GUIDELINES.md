@@ -61,7 +61,7 @@
 | :--- | :--- | :--- | :--- |
 | `RSK-001` | IDM-VTON cold starts, rate limits, or high latency | Critical / High | Evaluate providers in `P4` (`DEC-008`); enforce async timeout + explicitly labeled `fallback_demo` (`DEC-005`). |
 | `RSK-002` | Hackathon schedule overrun on secondary features | Critical / High | Enforce `PRD.md` Section 4.1 MVP boundary; showcase already-verified frontend workspaces cleanly. |
-| `RSK-003` | FE-to-BE DTO mismatch during `P5` integration | High / Medium | Mirror exact field names & Zod schemas from `src/lib/*` and `docs/DB_AND_API_CONTRACTS.md`. |
+| `RSK-003` | FE-to-BE DTO mismatch during `P5` integration | High / Medium | Mirror exact field names & Zod schemas from `frontend/src/lib/*` and `docs/DB_AND_API_CONTRACTS.md`. |
 | `RSK-004` | Sensitive body photos/data mishandling | High / Medium | Enforce server MIME/magic-byte checks, EXIF stripping, private UUID keys + signed URLs, TTL cleanup, and anonymized demo models. |
 | `RSK-005` | Venue Wi-Fi instability during live pitch | High / Medium | Local fallback mode + offline recorded walkthrough (`DPY-007`). |
 | `RSK-006` | Unclear team ownership across P3–P6 | Medium / Medium | Assign concrete owners in `09_TEAM` & `DEC-007` before starting `P3`. |
@@ -70,7 +70,7 @@
 
 ## 4. Engineering & Ponytail Coding Guidelines (`DOC-025`, `DEC-002`)
 
-1. **Frontend Is Source of Truth for Validation:** Share pure TypeScript validators & Zod schemas from `src/lib/*` between UI and `src/app/api/*`; never duplicate validation logic.
+1. **Frontend Is Source of Truth for Validation:** Share pure TypeScript validators & Zod schemas from `frontend/src/lib/*` between UI and `frontend/src/app/api/*`; never duplicate validation logic.
 2. **Ponytail Minimalism (`DEC-002`):** Prefer platform primitives (`crypto.randomUUID()`, native `fetch`, Next Route Handlers, Drizzle typed queries) before adding npm packages. Zero `console.log` debug statements or silent `catch` blocks.
 3. **Honest Error & AI States (`DEC-005`):** Always badge simulated/fallback responses honestly; preserve explicit Not Found & Role Guard states (`BUG-003`, `BUG-007`).
 4. **Preserve Visual Locks (`DEC-003`, `DEC-004`):** Never alter approved Hero artwork/layout or Futuristic Footer composition during backend wiring.

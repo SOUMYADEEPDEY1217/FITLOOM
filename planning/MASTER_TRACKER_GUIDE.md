@@ -1,7 +1,7 @@
 # FITLOOM Master Tracker Guide
 
 **Central Live Tracker (Google Sheets):** https://docs.google.com/spreadsheets/d/14kKDELhpmE3QM5h9-ZSIoSWaSsmW2Yc86xPTvliwwIA/edit  
-**Local Backup Workbook:** [FITLOOM_MASTER_PROJECT_TRACKER.xlsx](file:///c:/Users/mddan/Desktop/FITLOOM/FITLOOM_MASTER_PROJECT_TRACKER.xlsx)  
+**Local Backup Workbook:** [FITLOOM_MASTER_PROJECT_TRACKER.xlsx](./FITLOOM_MASTER_PROJECT_TRACKER.xlsx)  
 **Project:** FITLOOM (AI Fashion Intelligence & Fit Calibration Platform)  
 **Team:** PARADOX | **Event:** Hack N Pitch — E-Summit '26, Jadavpur University  
 

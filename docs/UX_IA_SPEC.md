@@ -1,7 +1,7 @@
 # FITLOOM — User Personas, Journeys & Information Architecture
 
 - **Task Reference:** `FL-P1-003` (`03_DOCUMENTATION`: `DOC-007`, `DOC-008`, `DOC-009`)
-- **Verified Codebase Sitemap:** All `40` Next.js App Router pages (`src/app/**/page.tsx`) + `not-found.tsx` + `error.tsx`
+- **Verified Codebase Sitemap:** All `40` Next.js App Router pages (`frontend/src/app/**/page.tsx`) + `not-found.tsx` + `error.tsx`
 
 ---
 
@@ -41,7 +41,7 @@
 
 ## 3. Information Architecture & Complete `40`-Route Sitemap
 
-All `40` verified `src/app/**/page.tsx` routes map cleanly into 5 top-level zones:
+All `40` verified `frontend/src/app/**/page.tsx` routes map cleanly into 5 top-level zones:
 
 | Zone | Routes | Nav / Guard Surface | State / Persistence (`PH9` Baseline -> `P3` Plan) |
 | :--- | :--- | :--- | :--- |

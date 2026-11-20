@@ -69,6 +69,8 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
   const shouldRestoreFocusRef = useRef(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const isShopPage = pathname === "/shop";
 
   const validWishlistCount = getValidWishlistCount(wishlistIds);
   const customerOrders = useMemo(
@@ -135,6 +137,11 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
       if (e.key === "Escape") {
         setProfileOpen(false);
         setNotifOpen(false);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
       }
     }
     document.addEventListener("mousedown", handleOutside);
@@ -507,9 +514,9 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
 
       {/* Clean Full-Width Marketplace Top Header */}
       <header className="sticky top-0 z-30 flex h-16 w-full items-center border-b border-[#EAE2F8] bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-2.5 px-3 sm:gap-4 sm:px-6 lg:px-8">
-          {/* Left: Hamburger Menu Button + Brand Logo + Search */}
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3.5">
+        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-1.5 px-2.5 sm:gap-4 sm:px-6 lg:px-8">
+          {/* Left: Hamburger Menu Button + Brand Logo */}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
             <button
               ref={triggerRef}
               type="button"
@@ -517,7 +524,7 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
               aria-expanded={drawerOpen}
               aria-controls="customer-nav-drawer"
               onClick={openDrawer}
-              className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[#E5DAF5] bg-white text-[#2A1434] transition-colors hover:border-[#7E2DF2]/50 hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
+              className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl text-[#2A1434] transition-colors hover:bg-[#F4EEFE] hover:text-[#6633EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2] sm:h-9 sm:w-9"
             >
               <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -529,34 +536,38 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#7E2DF2] to-[#5E22DF] text-white shadow-[0_4px_12px_rgba(126,45,242,0.28)]">
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
               </span>
-              <span className="hidden text-base font-extrabold tracking-[0.12em] text-[#1D0B24] sm:inline">
+              <span className="hidden text-base font-extrabold tracking-[0.1em] text-[#1D0B24] sm:inline">
                 FITLOOM<sup className="ml-0.5 text-[10px] font-semibold">®</sup>
               </span>
             </Link>
-
-            {/* Live Marketplace Search */}
-            <form
-              onSubmit={handleSearchSubmit}
-              role="search"
-              className="relative min-w-0 flex-1 max-w-md"
-            >
-              <Search
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                aria-hidden="true"
-              />
-              <input
-                type="search"
-                value={searchValue}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                aria-label="Search garments"
-                placeholder="Search for shirts, trousers, jackets..."
-                className="h-10 w-full rounded-full border border-[#E6DCF7] bg-[#F7F4FC] pl-10 pr-4 text-xs text-[#1D0B24] placeholder:text-slate-400 transition-colors focus:border-[#7E2DF2] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C4B5FD] sm:text-sm"
-              />
-            </form>
           </div>
 
+          {/* Center: Wide Rounded Marketplace Search */}
+          <form
+            onSubmit={handleSearchSubmit}
+            role="search"
+            className="relative mx-0.5 min-w-0 flex-1 max-w-xl sm:mx-1"
+          >
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 sm:left-3.5 sm:h-4 sm:w-4"
+              aria-hidden="true"
+            />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={searchValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              aria-label="Search garments"
+              placeholder="Search for shirts, trousers, jackets, custom fit..."
+              className="h-9 w-full rounded-full border border-[#E6DCF7] bg-[#F8F5FE] pl-8 pr-2.5 text-xs text-[#1D0B24] placeholder:text-slate-400 transition-colors focus:border-[#7E2DF2] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C4B5FD] sm:h-10 sm:pl-10 sm:pr-4 sm:text-sm md:pr-20"
+            />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center rounded-full border border-[#E4DAF5] bg-white px-2.5 py-0.5 font-sans text-[11px] font-semibold text-slate-500 shadow-2xs md:inline-flex">
+              Ctrl + K
+            </kbd>
+          </form>
+
           {/* Right: Notifications, Wishlist, Cart, Customer Profile Dropdown */}
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
             {/* Notifications Popover */}
             <div ref={notifRef} className="relative">
               <button
@@ -567,13 +578,14 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
                   setNotifOpen((prev) => !prev);
                   setProfileOpen(false);
                 }}
-                className="relative inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-[#EAE2F8] bg-white text-[#2A1434] transition-colors hover:border-[#7E2DF2]/50 hover:bg-violet-50/70 hover:text-[#6633EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
+                className="relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[#2A1434] transition-colors hover:bg-[#F4EEFE] hover:text-[#6633EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2] sm:h-9 sm:w-9"
               >
-                <Bell className="h-4 w-4" aria-hidden="true" />
+                <Bell className="h-[17px] w-[17px] sm:h-[18px] sm:w-[18px]" aria-hidden="true" />
                 {customerOrders.length > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[#7E2DF2] px-1 text-[10px] font-bold text-white">
-                    {customerOrders.length}
-                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#7E2DF2] ring-2 ring-white"
+                  />
                 )}
               </button>
 
@@ -627,11 +639,11 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
             <Link
               href="/wishlist"
               aria-label={`Wishlist with ${validWishlistCount} items`}
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#EAE2F8] bg-white text-[#2A1434] transition-colors hover:border-[#7E2DF2]/50 hover:bg-violet-50/70 hover:text-[#6633EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-[#2A1434] transition-colors hover:bg-[#F4EEFE] hover:text-[#6633EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
             >
-              <Heart className="h-4 w-4" aria-hidden="true" />
+              <Heart className="h-[18px] w-[18px]" aria-hidden="true" />
               {validWishlistCount > 0 && (
-                <span className="absolute -right-1 -top-1 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[#7E2DF2] px-1 text-[10px] font-bold text-white">
+                <span className="absolute right-0.5 top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#7E2DF2] px-1 text-[10px] font-bold text-white ring-2 ring-white">
                   {validWishlistCount}
                 </span>
               )}
@@ -641,18 +653,18 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
             <Link
               href="/cart"
               aria-label={`Shopping cart with ${cartCount} items`}
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#EAE2F8] bg-white text-[#2A1434] transition-colors hover:border-[#7E2DF2]/50 hover:bg-violet-50/70 hover:text-[#6633EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-[#2A1434] transition-colors hover:bg-[#F4EEFE] hover:text-[#6633EE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
             >
-              <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+              <ShoppingBag className="h-[18px] w-[18px]" aria-hidden="true" />
               {cartCount > 0 && (
-                <span className="absolute -right-1 -top-1 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[#7E2DF2] px-1 text-[10px] font-bold text-white">
+                <span className="absolute right-0.5 top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#7E2DF2] px-1 text-[10px] font-bold text-white ring-2 ring-white">
                   {cartCount}
                 </span>
               )}
             </Link>
 
             {/* Customer Profile Dropdown */}
-            <div ref={profileRef} className="relative">
+            <div ref={profileRef} className="relative pl-0.5 sm:pl-1">
               <button
                 type="button"
                 aria-label="Customer account menu"
@@ -661,13 +673,13 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
                   setProfileOpen((prev) => !prev);
                   setNotifOpen(false);
                 }}
-                className="flex cursor-pointer items-center gap-2 rounded-xl border border-transparent px-1.5 py-1 transition-colors hover:border-[#EAE2F8] hover:bg-[#FAF8FE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
+                className="flex cursor-pointer items-center gap-2 rounded-full border border-transparent py-1 pl-1 pr-1.5 transition-colors hover:border-[#EAE2F8] hover:bg-[#FAF8FE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7E2DF2]"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#7E2DF2] to-[#4E1A6B] text-xs font-bold text-white">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#7E2DF2] to-[#5B21B6] text-xs font-bold text-white shadow-xs">
                   {getInitials(user.name)}
                 </span>
                 <span className="hidden text-left sm:block">
-                  <span className="block max-w-[110px] truncate text-xs font-bold leading-tight text-[#1D0B24]">
+                  <span className="block max-w-[115px] truncate text-xs font-bold leading-tight text-[#1D0B24]">
                     {user.name}
                   </span>
                   <span className="block text-[10px] font-medium capitalize text-slate-500">
@@ -753,7 +765,12 @@ export function CustomerAppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Full-Width Main Workspace Content */}
-      <main className="mx-auto w-full max-w-[1440px] min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+      <main
+        className={cn(
+          "w-full min-w-0 flex-1",
+          !isShopPage && "mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8"
+        )}
+      >
         {children}
       </main>
     </div>

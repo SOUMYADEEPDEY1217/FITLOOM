@@ -16,7 +16,10 @@ export function MainShell({ children }: { children: React.ReactNode }) {
     return <CustomerAppShell>{children}</CustomerAppShell>;
   }
 
-  const isFullBleed = pathname === "/" || AUTH_FULLSCREEN_ROUTES.has(pathname);
+  const isFullBleed =
+    pathname === "/" ||
+    pathname === "/shop" ||
+    AUTH_FULLSCREEN_ROUTES.has(pathname);
 
   if (isFullBleed) {
     return <main className="w-full min-w-0 flex-1">{children}</main>;

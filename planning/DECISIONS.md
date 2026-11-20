@@ -1,6 +1,6 @@
 # FITLOOM Architecture & Governance Decisions
 
-Synced with `12_DECISION_LOG` in [FITLOOM_MASTER_PROJECT_TRACKER.xlsx](file:///c:/Users/mddan/Desktop/FITLOOM/FITLOOM_MASTER_PROJECT_TRACKER.xlsx).
+Synced with `12_DECISION_LOG` in [FITLOOM_MASTER_PROJECT_TRACKER.xlsx](./FITLOOM_MASTER_PROJECT_TRACKER.xlsx).
 
 ---
 

@@ -7,9 +7,9 @@
 
 ## 1. Security Architecture & Multi-Role Authorization (`DOC-018`)
 
-### 1.1 Current Frontend Showcase Guardrails (`src/` Verified Baseline)
+### 1.1 Current Frontend Showcase Guardrails (`frontend/src/` Verified Baseline)
 - Zod input validation on Auth, Body Profile, Checkout, Seller Products, Tailor Profile/Registration, Admin Moderation, and Contact forms.
-- Client upload filter in [try-on/page.tsx](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/app/try-on/page.tsx#L40-L185): `ALLOWED_IMAGE_TYPES = {image/jpeg, image/png, image/webp}`, `MAX_IMAGE_SIZE_BYTES = 10 MB`.
+- Client upload filter in [try-on/page.tsx](../frontend/frontend/src/app/try-on/page.tsx#L40-L185): `ALLOWED_IMAGE_TYPES = {image/jpeg, image/png, image/webp}`, `MAX_IMAGE_SIZE_BYTES = 10 MB`.
 - Explicit role separation via `WorkspaceRoleGuard` (never auto-switches role on route navigation) and suspended partner detection (`evaluatePartnerSuspension`).
 - Currently zero `.env*` files and zero external secrets exist in the repository (`PH9-A` baseline).
 
@@ -54,8 +54,8 @@ One authenticated Better Auth `users` account holds **additive capabilities** st
 ## 3. Uniform Error-Handling & Resilience Strategy (`DOC-021`)
 
 ### 3.1 Verified UI Boundaries
-- **404 Not Found ([not-found.tsx](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/app/not-found.tsx)):** Branded recovery links `/` and `/shop` (verified HTTP `404` on unknown routes).
-- **Runtime Boundary ([error.tsx](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/app/error.tsx)):** Recoverable `reset()` retry + `/` home link without crashing root layout.
+- **404 Not Found ([not-found.tsx](../frontend/frontend/src/app/not-found.tsx)):** Branded recovery links `/` and `/shop` (verified HTTP `404` on unknown routes).
+- **Runtime Boundary ([error.tsx](../frontend/frontend/src/app/error.tsx)):** Recoverable `reset()` retry + `/` home link without crashing root layout.
 - **Invalid Detail Slugs (`BUG-003` Fixed):** `/shop/[id]`, `/orders/[id]`, `/tailor/orders/[id]` render dedicated inline Not Found recovery cards.
 
 ### 3.2 Standardized Backend API Error Envelope (`BE-011`)

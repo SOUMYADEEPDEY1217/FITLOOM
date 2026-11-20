@@ -31,7 +31,7 @@ FITLOOM’s Fit Intelligence system connects human biological anatomy with manuf
 
 ## 2. Anthropometric Human Body Profile Schema
 
-Corresponds to the client schema in `src/lib/body-profile-utils.ts` and the planned PostgreSQL `body_profiles` table (`docs/DB_AND_API_CONTRACTS.md`).
+Corresponds to the client schema in `frontend/src/lib/body-profile-utils.ts` and the planned PostgreSQL `body_profiles` table (`docs/DB_AND_API_CONTRACTS.md`).
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐

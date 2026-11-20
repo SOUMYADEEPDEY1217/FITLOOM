@@ -185,7 +185,7 @@ The application uses **Next.js 15 App Router** with two distinct rendering shell
 ### Page Route Map (42 Pages)
 
 ```
-src/app/
+frontend/src/app/
 │
 ├── page.tsx                         /           ← Landing page
 │
@@ -283,7 +283,7 @@ Five user roles control every route, enforced client-side by `AuthRouteGuard` vi
 ### Component Architecture
 
 ```
-src/components/
+frontend/src/components/
 │
 ├── providers/                 Global runtime providers
 │   ├── fitloom-provider.tsx   FitloomContext — in-memory state (role, cart, wishlist…)
@@ -374,7 +374,7 @@ src/components/
                │  consumed by any client component via useContext
                ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                      Utility Libraries  (src/lib/)           │
+│                      Utility Libraries  (frontend/src/lib/)  │
 ├─────────────────────────┬────────────────────────────────────┤
 │  auth-routes.ts         │  Route classification & RBAC logic │
 │  workspace-config.ts    │  Workspace definitions (nav, roles)│
@@ -423,7 +423,7 @@ flowchart TD
         ARG["AuthRouteGuard\nRBAC enforcement"]
     end
 
-    subgraph LibLayer["src/lib/ — Utility & Logic Layer"]
+    subgraph LibLayer["frontend/src/lib/ — Utility & Logic Layer"]
         AR["auth-routes.ts"]
         WC["workspace-config.ts"]
         MD["mock-data.ts"]
@@ -565,7 +565,7 @@ The current frontend contains **42 App Router pages**:
 To keep the project transparent, the current implementation should be understood as a **frontend prototype**, not a fully deployed production platform:
 
 - The 42-page Next.js interface is implemented in the repository.
-- Product, account, order, and other demonstration data are supplied through local mock fixtures (`src/lib/mock-data.ts`).
+- Product, account, order, and other demonstration data are supplied through local mock fixtures (`frontend/src/lib/mock-data.ts`).
 - `FitloomProvider` manages client-side in-memory state for the demo experience.
 - `AuthRouteGuard` enforces client-side route boundaries across guest, customer, seller, tailor, and admin demo roles.
 - Zod is used for relevant data and form validation.
@@ -578,9 +578,12 @@ This distinction is intentional: the interface demonstrates the product journey 
 ## Repository Structure
 
 ```text
-FITLOOM/
+FITLOOM_updated/
 ├── assets/
 │   └── fitloom-banner.svg
+├── backend/                  ← Reserved for planned backend APIs & DB layer
+├── ai-ml/                    ← Reserved for planned VTON & fit inference services
+├── avatar-engine/            ← Reserved for planned 3D avatar engine integration
 ├── docs/
 │   ├── AI_AND_FIT_SPEC.md
 │   ├── DB_AND_API_CONTRACTS.md
@@ -598,66 +601,79 @@ FITLOOM/
 │   ├── PROJECT_ROADMAP.md
 │   ├── PROJECT_STATUS.md
 │   └── TEAM_RESPONSIBILITIES.md
-├── public/
-│   └── assets/
-│       ├── hero/
-│       ├── footer/
-│       └── products/
-├── src/
-│   ├── app/                  ← 42 Next.js App Router pages
-│   │   ├── page.tsx          ← Landing
-│   │   ├── shop/
-│   │   ├── body-profile/
-│   │   ├── fit-check/
-│   │   ├── try-on/
-│   │   ├── studio/
-│   │   ├── customfit/
-│   │   ├── dashboard/
-│   │   ├── cart/
-│   │   ├── checkout/
-│   │   ├── orders/
-│   │   ├── wishlist/
-│   │   ├── compare/
-│   │   ├── saved-looks/
-│   │   ├── login/
-│   │   ├── signup/
-│   │   ├── auth/
-│   │   ├── seller/
-│   │   ├── tailor/
-│   │   ├── admin/
-│   │   └── about|faq|how-it-works|contact|privacy|terms|…
-│   ├── components/           ← UI component library
-│   │   ├── auth/
-│   │   ├── hero/
-│   │   ├── home/
-│   │   ├── layout/
-│   │   ├── providers/
-│   │   ├── body-profile/
-│   │   ├── shop/
-│   │   ├── workspace/
-│   │   ├── public/
-│   │   └── ui/
-│   └── lib/                  ← Utility, logic & mock-data layer
-│       ├── auth-routes.ts
-│       ├── workspace-config.ts
-│       ├── mock-data.ts
-│       ├── fit-intelligence-utils.ts
-│       ├── body-profile-utils.ts
-│       ├── shop-utils.ts
-│       ├── studio-utils.ts
-│       ├── customfit-utils.ts
-│       ├── checkout-utils.ts
-│       ├── compare-wishlist-utils.ts
-│       ├── seller-workspace-utils.ts
-│       ├── tailor-workspace-utils.ts
-│       ├── admin-workspace-utils.ts
-│       ├── public-pages-utils.ts
-│       ├── route-metadata.ts
-│       └── utils.ts
-├── next.config.ts
-├── components.json
-├── tsconfig.json
-├── package.json
+├── Research/
+│   ├── Fit_Intelligence_Research.md
+│   ├── Fit_Scoring_Methodology.md
+│   ├── MODEL_COMPARISON.md
+│   ├── PERFORMANCE_ANALYSIS.md
+│   ├── Test_Cases.md
+│   ├── VTON_RESEARCH.md
+│   └── measurement_Schema.md
+├── frontend/                 ← Standalone Next.js 15 frontend application
+│   ├── public/
+│   │   └── assets/
+│   │       ├── hero/
+│   │       ├── footer/
+│   │       └── products/
+│   ├── src/
+│   │   ├── app/              ← 42 Next.js App Router pages
+│   │   │   ├── page.tsx      ← Landing
+│   │   │   ├── shop/
+│   │   │   ├── body-profile/
+│   │   │   ├── fit-check/
+│   │   │   ├── try-on/
+│   │   │   ├── studio/
+│   │   │   ├── customfit/
+│   │   │   ├── dashboard/
+│   │   │   ├── cart/
+│   │   │   ├── checkout/
+│   │   │   ├── orders/
+│   │   │   ├── wishlist/
+│   │   │   ├── compare/
+│   │   │   ├── saved-looks/
+│   │   │   ├── login/
+│   │   │   ├── signup/
+│   │   │   ├── auth/
+│   │   │   ├── seller/
+│   │   │   ├── tailor/
+│   │   │   ├── admin/
+│   │   │   └── about|faq|how-it-works|contact|privacy|terms|…
+│   │   ├── components/       ← UI component library
+│   │   │   ├── auth/
+│   │   │   ├── hero/
+│   │   │   ├── home/
+│   │   │   ├── layout/
+│   │   │   ├── providers/
+│   │   │   ├── body-profile/
+│   │   │   ├── shop/
+│   │   │   ├── workspace/
+│   │   │   ├── public/
+│   │   │   └── ui/
+│   │   └── lib/              ← Utility, logic & mock-data layer
+│   │       ├── auth-routes.ts
+│   │       ├── workspace-config.ts
+│   │       ├── mock-data.ts
+│   │       ├── fit-intelligence-utils.ts
+│   │       ├── body-profile-utils.ts
+│   │       ├── shop-utils.ts
+│   │       ├── studio-utils.ts
+│   │       ├── customfit-utils.ts
+│   │       ├── checkout-utils.ts
+│   │       ├── compare-wishlist-utils.ts
+│   │       ├── seller-workspace-utils.ts
+│   │       ├── tailor-workspace-utils.ts
+│   │       ├── admin-workspace-utils.ts
+│   │       ├── public-pages-utils.ts
+│   │       ├── route-metadata.ts
+│   │       └── utils.ts
+│   ├── next.config.ts
+│   ├── components.json
+│   ├── eslint.config.mjs
+│   ├── postcss.config.mjs
+│   ├── tsconfig.json
+│   ├── package.json
+│   └── package-lock.json
+├── .gitignore
 └── README.md
 ```
 
@@ -671,11 +687,11 @@ FITLOOM/
 - npm
 - Git
 
-### 1. Clone the repository
+### 1. Clone the repository & enter the frontend workspace
 
 ```bash
 git clone <YOUR_REPOSITORY_URL>
-cd FITLOOM
+cd FITLOOM_updated/frontend
 ```
 
 ### 2. Install dependencies
@@ -692,7 +708,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Available Scripts
+### Available Scripts (run inside `frontend/`)
 
 | Command | Description |
 | --- | --- |

@@ -251,11 +251,11 @@ Test Matrix:
 
 ## 9. Integration Roadmap for Soumyadeep (`TM-002`)
 
-- [x] **Deliverable 1: Garment & Anthropometric Schema** (`src/lib/body-profile-utils.ts`, `docs/RESEARCH.md`)
-- [x] **Deliverable 2: Deterministic Fit Calculation Core** (`src/lib/fit-intelligence-utils.ts`)
-- [ ] **Deliverable 3: Standalone Universal Size Chart Normalizer Utility** (`src/lib/size-chart-parser.ts`)
-- [ ] **Deliverable 4: Jest/Vitest Automated Test Suite** (`src/__tests__/fit-intelligence.test.ts`)
-- [ ] **Deliverable 5: Live API Integration (`POST /api/fit-check`)** (`src/app/api/fit-check/route.ts`)
+- [x] **Deliverable 1: Garment & Anthropometric Schema** (`frontend/src/lib/body-profile-utils.ts`, `docs/RESEARCH.md`)
+- [x] **Deliverable 2: Deterministic Fit Calculation Core** (`frontend/src/lib/fit-intelligence-utils.ts`)
+- [ ] **Deliverable 3: Standalone Universal Size Chart Normalizer Utility** (`frontend/src/lib/size-chart-parser.ts`)
+- [ ] **Deliverable 4: Jest/Vitest Automated Test Suite** (`frontend/src/__tests__/fit-intelligence.test.ts`)
+- [ ] **Deliverable 5: Live API Integration (`POST /api/fit-check`)** (`frontend/src/app/api/fit-check/route.ts`)
 
 ---
 

@@ -1,10 +1,13 @@
 
 # Dependencies
 node_modules/
+frontend/node_modules/
 
 # Next.js
 .next/
+frontend/.next/
 out/
+frontend/out/
 
 # Environment variables
 .env
@@ -13,9 +16,20 @@ out/
 
 # Build files
 *.tsbuildinfo
+frontend/*.tsbuildinfo
+dist/
 
 # Deployment
 .vercel/
+
+# Future Services (Python / AI / ML / Avatar)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+backend/dist/
+ai-ml/checkpoints/
+avatar-engine/models/
 
 # System files
 .DS_Store

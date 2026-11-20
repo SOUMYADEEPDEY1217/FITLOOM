@@ -9,7 +9,7 @@
 
 ## 1. Deterministic Fit Intelligence Specification (`DOC-017`, `BE-007`)
 
-Source implementation verified in [fit-intelligence-utils.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/fit-intelligence-utils.ts) and [mock-data.ts](file:///C:/Users/mddan/Downloads/FITLOOM_updated/FITLOOM/FITLOOM/src/lib/mock-data.ts). Both client UI and future `POST /api/fit-check` (`BE-007`) must execute identical arithmetic.
+Source implementation verified in [fit-intelligence-utils.ts](../frontend/frontend/src/lib/fit-intelligence-utils.ts) and [mock-data.ts](../frontend/frontend/src/lib/mock-data.ts). Both client UI and future `POST /api/fit-check` (`BE-007`) must execute identical arithmetic.
 
 ### 1.0 Canonical Unit, Precision & Conversion Rules
 - **Canonical Storage Unit & Precision:** Both Body Profiles and Garment Measurements (`chest_cm`, `waist_cm`, and any future garment dimensions such as shoulder/sleeve/inseam/hip) are stored canonically in **centimeters (`numeric(6,1)`, precision `0.1 cm`)**. Monetary prices remain strict integer INR (`integer`).

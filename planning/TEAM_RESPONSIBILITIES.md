@@ -14,7 +14,7 @@
 | `TM-003` | **Harshit Raj** | `TBD` | `TBD` | Active — Role Assignment Pending |
 | `TM-004` | **Krishnendu Das** | `TBD` | `TBD` | Active — Role Assignment Pending |
 
-> **Governance Rule:** Unknown assignments are intentionally marked `TBD` rather than invented. Before Phase 0 kickoff, Team PARADOX must confirm each member's primary domain (e.g., Product/PM & Pitch, Frontend/Design System, Backend/DB & Fit Engine, AI/ML & Integration) and update `09_TEAM` and `01_MASTER_TASKS` in [FITLOOM_MASTER_PROJECT_TRACKER.xlsx](file:///c:/Users/mddan/Desktop/FITLOOM/FITLOOM_MASTER_PROJECT_TRACKER.xlsx).
+> **Governance Rule:** Unknown assignments are intentionally marked `TBD` rather than invented. Before Phase 0 kickoff, Team PARADOX must confirm each member's primary domain (e.g., Product/PM & Pitch, Frontend/Design System, Backend/DB & Fit Engine, AI/ML & Integration) and update `09_TEAM` and `01_MASTER_TASKS` in [FITLOOM_MASTER_PROJECT_TRACKER.xlsx](./FITLOOM_MASTER_PROJECT_TRACKER.xlsx).
 
 ---
 
