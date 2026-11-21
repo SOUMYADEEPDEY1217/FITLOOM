@@ -25,10 +25,11 @@ export const products = pgTable(
   {
     id: text("id").primaryKey(),
     sellerPartnerId: uuid("seller_partner_id")
-      .notNull()
-      .references(() => partners.id),
+      .references(() => partners.id, { onDelete: "set null" }),
     name: text("name").notNull(),
+    description: text("description"),
     category: text("category").notNull(),
+    garmentType: text("garment_type"),
     fitType: text("fit_type").notNull(),
     occasion: text("occasion").notNull(),
     color: text("color").notNull(),
@@ -64,11 +65,16 @@ export const products = pgTable(
       "products_moderation_status_check",
       sql`${table.moderationStatus} IN ('pending_review', 'approved', 'rejected', 'suspended')`
     ),
+    check(
+      "products_garment_type_check",
+      sql`${table.garmentType} IS NULL OR ${table.garmentType} IN ('tshirt', 'shirt', 'trousers', 'kurti')`
+    ),
     index("products_status_moderation_category_idx").on(
       table.status,
       table.moderationStatus,
       table.category
     ),
+    index("products_garment_type_idx").on(table.garmentType),
   ]
 );
 
@@ -80,8 +86,8 @@ export const garmentMeasurements = pgTable(
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
     size: text("size").notNull(),
-    chestCm: numeric("chest_cm", { precision: 6, scale: 1 }).notNull(),
-    waistCm: numeric("waist_cm", { precision: 6, scale: 1 }).notNull(),
+    chestCm: numeric("chest_cm", { precision: 6, scale: 1 }),
+    waistCm: numeric("waist_cm", { precision: 6, scale: 1 }),
     extraDimsCm: jsonb("extra_dims_cm"),
   },
   (table) => [
@@ -89,8 +95,18 @@ export const garmentMeasurements = pgTable(
       table.productId,
       table.size
     ),
-    check("garment_measurements_chest_positive", sql`${table.chestCm} > 0`),
-    check("garment_measurements_waist_positive", sql`${table.waistCm} > 0`),
+    check(
+      "garment_measurements_chest_positive",
+      sql`${table.chestCm} IS NULL OR ${table.chestCm} > 0`
+    ),
+    check(
+      "garment_measurements_waist_positive",
+      sql`${table.waistCm} IS NULL OR ${table.waistCm} > 0`
+    ),
+    check(
+      "garment_measurements_has_dimension",
+      sql`${table.chestCm} IS NOT NULL OR ${table.waistCm} IS NOT NULL`
+    ),
   ]
 );
 

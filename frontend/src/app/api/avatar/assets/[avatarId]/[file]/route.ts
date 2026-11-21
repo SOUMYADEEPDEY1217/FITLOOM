@@ -4,6 +4,8 @@ import { db } from "@/server/db";
 import { avatars } from "@/server/db/schema";
 import { fetchAssetStream } from "@/server/avatar";
 
+export const dynamic = "force-dynamic";
+
 export const GET = createApiHandler(
   async ({ user, params, req }) => {
     if (!user) {

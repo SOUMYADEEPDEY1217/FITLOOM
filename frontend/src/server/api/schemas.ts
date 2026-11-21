@@ -29,3 +29,19 @@ export const UpdateUserMeSchema = z.object({
 });
 
 export type UpdateUserMeInput = z.infer<typeof UpdateUserMeSchema>;
+
+export const ProductsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+  category: z.string().trim().optional(),
+  garmentType: z.enum(["tshirt", "shirt", "trousers", "kurti"]).optional(),
+  search: z.string().trim().optional(),
+});
+export type ProductsQueryInput = z.infer<typeof ProductsQuerySchema>;
+
+export const FitCheckInputSchema = z.object({
+  productId: z.string().trim().min(1, "Product ID is required"),
+  size: z.enum(["S", "M", "L", "XL"]).optional(),
+  fitPreference: z.enum(["slim", "regular", "relaxed", "oversized"]).optional(),
+});
+export type FitCheckInput = z.infer<typeof FitCheckInputSchema>;

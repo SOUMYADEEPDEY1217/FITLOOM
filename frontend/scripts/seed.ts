@@ -349,12 +349,24 @@ export async function seed() {
   // 7. Seed Products & Garment Measurements
   console.log("  -> Seeding verified catalog garments & size charts...");
   for (const g of MOCK_GARMENTS) {
+    const garmentType =
+      g.garmentType ??
+      (g.category === "Trousers"
+        ? "trousers"
+        : g.category === "T-Shirts"
+        ? "tshirt"
+        : g.category === "Kurtis"
+        ? "kurti"
+        : "shirt");
+
     await db
       .insert(products)
       .values({
         id: g.id,
         sellerPartnerId: PARTNER_VERVE_ID,
         name: g.name,
+        description: g.description,
+        garmentType,
         category: g.category,
         fitType: g.fitType,
         occasion: g.occasion,
@@ -375,6 +387,8 @@ export async function seed() {
         target: products.id,
         set: {
           name: g.name,
+          description: g.description,
+          garmentType,
           category: g.category,
           fitType: g.fitType,
           occasion: g.occasion,
@@ -393,14 +407,14 @@ export async function seed() {
     for (const size of g.sizes) {
       const chestVal = g.chestMapCm[size];
       const waistVal = g.waistMapCm[size];
-      if (chestVal && waistVal) {
+      if (chestVal || waistVal) {
         await db
           .insert(garmentMeasurements)
           .values({
             productId: g.id,
             size,
-            chestCm: chestVal.toFixed(1),
-            waistCm: waistVal.toFixed(1),
+            chestCm: chestVal ? chestVal.toFixed(1) : null,
+            waistCm: waistVal ? waistVal.toFixed(1) : null,
           })
           .onConflictDoUpdate({
             target: [
@@ -408,8 +422,8 @@ export async function seed() {
               garmentMeasurements.size,
             ],
             set: {
-              chestCm: chestVal.toFixed(1),
-              waistCm: waistVal.toFixed(1),
+              chestCm: chestVal ? chestVal.toFixed(1) : null,
+              waistCm: waistVal ? waistVal.toFixed(1) : null,
             },
           });
       }

@@ -63,6 +63,7 @@ export const GARMENT_CATEGORIES: readonly GarmentCategory[] = [
   "Trousers",
   "T-Shirts",
   "Hoodies",
+  "Kurtis",
 ] as const;
 
 export const GARMENT_FIT_TYPES: readonly GarmentFitType[] = [
@@ -191,7 +192,7 @@ export const SellerProductFormSchema = z.object({
     .trim()
     .min(10, "Description must be at least 10 characters.")
     .max(400, "Description must be 400 characters or fewer."),
-  category: z.enum(["Shirts", "Outerwear", "Trousers", "T-Shirts", "Hoodies"]),
+  category: z.enum(["Shirts", "Outerwear", "Trousers", "T-Shirts", "Hoodies", "Kurtis"]),
   fitType: z.enum(["Slim", "Regular", "Relaxed"]),
   occasion: z.enum([
     "Work / Casual",
