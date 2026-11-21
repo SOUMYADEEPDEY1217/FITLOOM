@@ -116,3 +116,35 @@ All endpoints return `{ ok: true, data }` or `{ ok: false, error: { code, messag
 | `/api/admin/catalogue/[id]` | `PATCH` | Cap: `admin` | `{ action: approve\|reject\|suspend\|restore, reason? }` | Enforces `AdminModerationReasonSchema` (>= 5 chars) + audit log |
 | `/api/admin/orders` | `GET`, `POST` | Cap: `admin` | `GET`: read filters; `POST`: `{ orderId, note }` | Read-only cross-platform oversight (`checkout_groups` + `orders`) + append-only governance note logging; Admin has **no** stage override endpoint (`BE-011`) |
 | `/api/contact` | `POST` | Public | `ContactSchema` | `201 { inquiryId }` |
+| `/api/avatar/status` | `GET` | Cap: `customer` | — | `200 { status, modelReady, cudaAvailable }` / `503 SERVICE_UNAVAILABLE` (never leaks engine URL/token) |
+| `/api/avatar/preset` | `POST` | Cap: `customer` | `AvatarPresetInputSchema` (`gender?`) | Generates avatar from user's saved `body_profiles`; records ownership in `avatars` table (`201 { avatarId, measurements, assets, createdAt }`) / `422 MISSING_BODY_PROFILE` / `503 SERVICE_UNAVAILABLE` |
+| `/api/avatar/sizing` | `POST` | Cap: `customer` | `AvatarSizingInputSchema` | Evaluates garment ease & sizing recommendations against owned avatar (`200 { garment_type, gender, fit_preference, recommended_size, recommended_score, sizes[] }`) / `404 AVATAR_NOT_FOUND` / `503 SERVICE_UNAVAILABLE` |
+| `/api/avatar/assets/[avatarId]/[file]` | `GET` | Cap: `customer` (Owner) | Path `avatarId`, `file` | Ownership-checked streaming proxy (`apose.glb`, `tpose.glb`, `measurements.json`, `garment_*.glb`); returns `404 AVATAR_NOT_FOUND` on cross-user access (never `403` to prevent enumeration) / `400 DISALLOWED_FILE` / `400 INVALID_AVATAR_ID` / `503 SERVICE_UNAVAILABLE` |
+
+---
+
+## 5. Standard Backend Error Codes (`DOC-021`, `BE-011`)
+
+All Route Handlers adhere to the uniform `{ ok: false, error: { code, message, fieldErrors? } }` contract:
+
+| Status | Code | Meaning & Typical Context |
+| :--- | :--- | :--- |
+| **`400`** | `VALIDATION_ERROR` | Request failed Zod schema parsing; includes `fieldErrors` map. |
+| **`400`** | `BAD_REQUEST` | Malformed JSON body or invalid syntax. |
+| **`400`** | `INVALID_AVATAR_ID` | Avatar ID fails 8-char hex format validation (`^[a-f0-9]{8}$`). |
+| **`400`** | `DISALLOWED_FILE` | Requested asset filename is not on the engine allow-list. |
+| **`401`** | `UNAUTHORIZED` | Missing or invalid Better Auth HTTP-only session cookie. |
+| **`403`** | `FORBIDDEN` | Missing required capability or cross-origin CSRF violation. |
+| **`403`** | `PARTNER_SUSPENDED` | Partner operational status is suspended; blocks partner-scoped endpoints. |
+| **`403`** | `PARTNER_NOT_VERIFIED` | Partner application is still pending review or rejected. |
+| **`404`** | `NOT_FOUND` / `AVATAR_NOT_FOUND` | Resource not found, or resource owned by another user (strict 404 to prevent enumeration). |
+| **`404`** | `ASSET_NOT_FOUND` | Avatar asset file does not exist on the engine storage. |
+| **`404`** | `PRODUCT_NOT_FOUND` | Product ID not found or inactive. |
+| **`409`** | `EMAIL_EXISTS` / `PARTNER_APPLICATION_EXISTS` | Conflict on unique constraint (e.g. duplicate email or partner record). |
+| **`413`** | `PAYLOAD_TOO_LARGE` | Request body exceeds the 1MB or 10MB limit. |
+| **`415`** | `UNSUPPORTED_MEDIA_TYPE` | Content-Type header missing or not matching expected format. |
+| **`422`** | `MISSING_BODY_PROFILE` | Operation requires a saved anthropometric body profile that has not been created. |
+| **`429`** | `RATE_LIMITED` | Too many requests within the sliding window; includes `Retry-After` header. |
+| **`500`** | `INTERNAL_ERROR` | Unhandled internal exception; logged server-side, non-leaking generic message. |
+| **`503`** | `SERVICE_UNAVAILABLE` | External service (e.g. 3D avatar engine) is offline, unreachable, or timed out (`DEC-005`). |
+

@@ -324,6 +324,12 @@ export function createApiHandler<TBody = unknown, TResult = unknown>(
         params: resolvedParams,
       });
 
+      // Pass through raw Response instances (e.g. streaming asset proxies)
+      if (result instanceof Response) {
+        result.headers.set("x-request-id", requestId);
+        return result as unknown as NextResponse<ApiResponseEnvelope<TResult>>;
+      }
+
       // 7. Uniform success envelope
       return NextResponse.json<ApiResponseEnvelope<TResult>>(
         {
