@@ -727,7 +727,7 @@ describe("Avatar Engine Integration & Security", () => {
       const res2 = await postAvatarDress(req2);
       expect(res2.status).toBe(400);
 
-      // Invalid size
+      // Invalid size (non-alphanumeric or too long)
       mockSession(USER_A);
       const req3 = new NextRequest("http://localhost:3000/api/avatar/dress", {
         method: "POST",
@@ -738,11 +738,29 @@ describe("Avatar Engine Integration & Security", () => {
         body: JSON.stringify({
           avatarId: "deadbeef",
           garmentType: "shirt",
-          size: "3XL",
+          size: "INVALID-SIZE!",
         }),
       });
       const res3 = await postAvatarDress(req3);
       expect(res3.status).toBe(400);
+
+      // Invalid colorHex format
+      mockSession(USER_A);
+      const reqColor = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "M",
+          colorHex: "not-a-hex",
+        }),
+      });
+      const resColor = await postAvatarDress(reqColor);
+      expect(resColor.status).toBe(400);
 
       // Strict schema rejects extra fields
       mockSession(USER_A);
@@ -988,6 +1006,113 @@ describe("Avatar Engine Integration & Security", () => {
       expect(json.ok).toBe(true);
       expect(json.data.garment.fitPreference).toBe("relaxed");
       expect(json.data.garment.url).toBe("/api/avatar/assets/deadbeef/garment_tshirt.glb");
+    });
+
+    it("dresses trousers with waist size (e.g. 32) successfully", async () => {
+      mockSession(USER_A);
+
+      const mockAvatarsFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            { id: "avatar-a", userId: USER_A.id },
+          ]),
+        }),
+      });
+      vi.mocked(db.select).mockReturnValueOnce({ from: mockAvatarsFrom } as any);
+
+      (global.fetch as any).mockImplementationOnce(
+        async (_url: string, init: RequestInit) => {
+          const body = init.body as FormData;
+          expect(body.get("garment_type")).toBe("trousers");
+          expect(body.get("size")).toBe("32");
+
+          return new Response(
+            JSON.stringify({
+              avatar_id: "deadbeef",
+              garment_type: "trousers",
+              slot: "bottom",
+              glb_url: "/avatars/deadbeef/garment/garment_trousers.glb",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      );
+
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "trousers",
+          size: "32",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(json.data.garment.type).toBe("trousers");
+      expect(json.data.garment.size).toBe("32");
+      expect(json.data.garment.url).toBe(
+        "/api/avatar/assets/deadbeef/garment_trousers.glb"
+      );
+    });
+
+    it("forwards colorHex and viewMode to engine and returns them in response", async () => {
+      mockSession(USER_A);
+
+      const mockAvatarsFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            { id: "avatar-a", userId: USER_A.id },
+          ]),
+        }),
+      });
+      vi.mocked(db.select).mockReturnValueOnce({ from: mockAvatarsFrom } as any);
+
+      (global.fetch as any).mockImplementationOnce(
+        async (_url: string, init: RequestInit) => {
+          const body = init.body as FormData;
+          expect(body.get("color_hex")).toBe("#3f6212");
+          expect(body.get("view_mode")).toBe("heatmap");
+
+          return new Response(
+            JSON.stringify({
+              avatar_id: "deadbeef",
+              garment_type: "shirt",
+              slot: "top",
+              glb_url: "/avatars/deadbeef/garment/garment_shirt.glb",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      );
+
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "L",
+          colorHex: "#3f6212",
+          viewMode: "heatmap",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(json.data.garment.colorHex).toBe("#3f6212");
+      expect(json.data.garment.viewMode).toBe("heatmap");
     });
   });
 });

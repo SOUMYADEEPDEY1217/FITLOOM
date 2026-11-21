@@ -8,6 +8,8 @@ import {
   FitCheckResponse,
   AvatarDressInput,
   AvatarDressResponse,
+  AvatarSizingInput,
+  AvatarSizingResponse,
 } from "./types";
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
@@ -132,6 +134,12 @@ export async function dressAvatar(
   return api.post<AvatarDressResponse>("/api/avatar/dress", body);
 }
 
+export async function getAvatarSizing(
+  body: AvatarSizingInput
+): Promise<AvatarSizingResponse> {
+  return api.post<AvatarSizingResponse>("/api/avatar/sizing", body);
+}
+
 export const api = {
   get: <T>(url: string, options?: RequestOptions) =>
     request<T>(url, "GET", undefined, options),
@@ -147,6 +155,7 @@ export const api = {
   getProduct,
   fitCheck,
   dressAvatar,
+  getAvatarSizing,
 };
 
 export default api;

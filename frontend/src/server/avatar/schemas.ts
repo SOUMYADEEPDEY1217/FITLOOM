@@ -96,7 +96,12 @@ export const EngineSizingResponseSchema = z.object({
 
 export type EngineSizingResponse = z.infer<typeof EngineSizingResponseSchema>;
 
-export const AvatarDressSizeSchema = z.enum(["XS", "S", "M", "L", "XL", "XXL"]);
+export const AvatarDressSizeSchema = z
+  .string()
+  .trim()
+  .min(1, "Size cannot be empty")
+  .max(8, "Size must be at most 8 characters")
+  .regex(/^[A-Za-z0-9]+$/, "Size must contain only alphanumeric characters");
 export type AvatarDressSize = z.infer<typeof AvatarDressSizeSchema>;
 
 export const AvatarDressInputSchema = z
@@ -107,6 +112,11 @@ export const AvatarDressInputSchema = z
     garmentType: GarmentTypeSchema,
     size: AvatarDressSizeSchema,
     fitPreference: AppFitPreferenceSchema.optional(),
+    colorHex: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, "Invalid colorHex format")
+      .optional(),
+    viewMode: z.enum(["fabric", "heatmap"]).optional(),
   })
   .strict();
 
@@ -129,6 +139,8 @@ export const AvatarDressResultSchema = z.object({
     type: GarmentTypeSchema,
     size: AvatarDressSizeSchema,
     fitPreference: AppFitPreferenceSchema,
+    colorHex: z.string().optional(),
+    viewMode: z.enum(["fabric", "heatmap"]).optional(),
     url: z.string(),
   }),
 });

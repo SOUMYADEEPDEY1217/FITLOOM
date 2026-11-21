@@ -347,4 +347,91 @@ describe("api client", () => {
       });
     }
   });
+
+  it("calls getAvatarSizing with parameters and unwraps response", async () => {
+    const mockSizing = {
+      garment_type: "trousers",
+      gender: "male",
+      fit_preference: "regular",
+      recommended_size: "32",
+      recommended_score: 95,
+      sizes: [
+        { size: "28", fit_score: 80, overall: "Snug" },
+        { size: "30", fit_score: 90, overall: "Ideal" },
+        { size: "32", fit_score: 95, overall: "Ideal" },
+      ],
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ok: true, data: mockSizing }),
+    } as unknown as Response);
+
+    const result = await api.getAvatarSizing({
+      avatarId: "deadbeef",
+      garmentType: "trousers",
+      fitPreference: "regular",
+    });
+
+    expect(result).toEqual(mockSizing);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/avatar/sizing",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "trousers",
+          fitPreference: "regular",
+        }),
+      })
+    );
+  });
+
+  it("calls dressAvatar with trousers waist size, colorHex, and viewMode", async () => {
+    const mockDress = {
+      mode: "live_avatar_engine",
+      garment: {
+        type: "trousers",
+        size: "32",
+        fitPreference: "regular",
+        colorHex: "#3f6212",
+        viewMode: "heatmap",
+        url: "/api/avatar/assets/deadbeef/garment_trousers.glb",
+      },
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ok: true, data: mockDress }),
+    } as unknown as Response);
+
+    const result = await api.dressAvatar({
+      avatarId: "deadbeef",
+      garmentType: "trousers",
+      size: "32",
+      fitPreference: "regular",
+      colorHex: "#3f6212",
+      viewMode: "heatmap",
+    });
+
+    expect(result).toEqual(mockDress);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/avatar/dress",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "trousers",
+          size: "32",
+          fitPreference: "regular",
+          colorHex: "#3f6212",
+          viewMode: "heatmap",
+        }),
+      })
+    );
+  });
 });

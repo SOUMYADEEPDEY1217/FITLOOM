@@ -142,20 +142,52 @@ export type FitPreferenceAvatarOption = "slim" | "regular" | "relaxed" | "oversi
 export interface AvatarDressInput {
   avatarId: string;
   garmentType: GarmentTypeOption;
-  size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  size: string;
   fitPreference?: FitPreferenceAvatarOption;
+  colorHex?: string;
+  viewMode?: "fabric" | "heatmap";
 }
 
 export interface AvatarDressGarment {
   type: GarmentTypeOption;
-  size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  size: string;
   fitPreference?: FitPreferenceAvatarOption;
+  colorHex?: string;
+  viewMode?: "fabric" | "heatmap";
   url: string;
 }
 
 export interface AvatarDressResponse {
   mode: "live_avatar_engine" | "fallback_demo";
   garment: AvatarDressGarment;
+}
+
+// Avatar Sizing API Types
+export interface AvatarSizingInput {
+  avatarId?: string;
+  garmentType?: GarmentTypeOption | string;
+  fitPreference?: FitPreferenceAvatarOption | string;
+  customChart?: string;
+  chartUnit?: "in" | "cm";
+  chartType?: "garment" | "body";
+}
+
+export interface AvatarSizeItem {
+  size: string;
+  fit_score: number;
+  overall: string;
+  garment_spec_cm?: Record<string, number>;
+  zones?: Record<string, unknown>;
+  notes?: string[];
+}
+
+export interface AvatarSizingResponse {
+  garment_type: string;
+  gender: string;
+  fit_preference: string;
+  recommended_size: string;
+  recommended_score: number;
+  sizes: AvatarSizeItem[];
 }
 
 // ==========================================

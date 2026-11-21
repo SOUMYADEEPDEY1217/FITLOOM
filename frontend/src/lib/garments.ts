@@ -1,6 +1,6 @@
 import type { GarmentTypeOption, FitPreferenceAvatarOption } from "@/lib/api/types";
 
-export type AvatarGarmentSize = "XS" | "S" | "M" | "L" | "XL" | "XXL";
+export type AvatarGarmentSize = string;
 
 export interface GarmentTypeOptionItem {
   value: GarmentTypeOption;
@@ -15,7 +15,7 @@ export const GARMENT_TYPE_OPTIONS: ReadonlyArray<GarmentTypeOptionItem> = [
   { value: "kurti", label: "Kurti", category: "Kurtis" },
 ];
 
-export const SIZE_OPTIONS: ReadonlyArray<AvatarGarmentSize> = [
+export const SIZE_OPTIONS: ReadonlyArray<string> = [
   "XS",
   "S",
   "M",
@@ -36,3 +36,19 @@ export const FIT_PREFERENCE_OPTIONS: ReadonlyArray<FitPreferenceOptionItem> = [
   { value: "relaxed", label: "Relaxed", easeCm: 12 },
   { value: "oversized", label: "Oversized", easeCm: 15 },
 ];
+
+export interface FabricColorOption {
+  name: string;
+  hex: string;
+}
+
+export const FABRIC_COLOR_OPTIONS: ReadonlyArray<FabricColorOption> = [
+  { name: "Royal Blue", hex: "#2563eb" },
+  { name: "Slate", hex: "#334155" },
+  { name: "Off White", hex: "#e2e8f0" },
+  { name: "Olive Green", hex: "#3f6212" },
+  { name: "Burgundy", hex: "#7f1d1d" },
+];
+
+export type GarmentViewMode = "fabric" | "heatmap";
+

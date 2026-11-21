@@ -53,6 +53,8 @@ export const POST = createApiHandler(
       garmentType: body.garmentType,
       size: body.size,
       fitPreference,
+      colorHex: body.colorHex,
+      viewMode: body.viewMode,
     });
 
     // 4. Resolve asset file and form customer URL
@@ -65,6 +67,8 @@ export const POST = createApiHandler(
         type: body.garmentType,
         size: body.size,
         fitPreference,
+        ...(body.colorHex ? { colorHex: body.colorHex } : {}),
+        ...(body.viewMode ? { viewMode: body.viewMode } : {}),
         url: assetUrl,
       },
     };

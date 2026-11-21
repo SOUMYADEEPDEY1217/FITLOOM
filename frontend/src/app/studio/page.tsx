@@ -53,12 +53,14 @@ import {
   ProductItem,
   GarmentTypeOption,
   FitPreferenceAvatarOption,
+  AvatarSizeItem,
 } from "@/lib/api/types";
 import {
   GARMENT_TYPE_OPTIONS,
-  SIZE_OPTIONS,
   FIT_PREFERENCE_OPTIONS,
+  FABRIC_COLOR_OPTIONS,
   type AvatarGarmentSize,
+  type GarmentViewMode,
 } from "@/lib/garments";
 
 type StudioBackdrop = "violet" | "light" | "slate";
@@ -270,6 +272,10 @@ export default function StyleStudioPage() {
   const [garmentPanelSelectedSize, setGarmentPanelSelectedSize] = useState<AvatarGarmentSize>("M");
   const [garmentPanelFitPreference, setGarmentPanelFitPreference] = useState<FitPreferenceAvatarOption>("regular");
   const [garmentPanelRecommendedSize, setGarmentPanelRecommendedSize] = useState<AvatarGarmentSize | null>(null);
+  const [garmentPanelAvailableSizes, setGarmentPanelAvailableSizes] = useState<AvatarSizeItem[]>([]);
+  const [garmentPanelSizingLoading, setGarmentPanelSizingLoading] = useState<boolean>(false);
+  const [garmentPanelColorHex, setGarmentPanelColorHex] = useState<string>("#2563eb");
+  const [garmentPanelViewMode, setGarmentPanelViewMode] = useState<GarmentViewMode>("fabric");
   const [garmentPanelLoading, setGarmentPanelLoading] = useState(false);
   const [garmentPanelError, setGarmentPanelError] = useState<string | null>(null);
   const [garmentPanelDressedUrl, setGarmentPanelDressedUrl] = useState<string | null>(null);
@@ -451,43 +457,55 @@ export default function StyleStudioPage() {
     };
   }, [garmentPanelGarmentType]);
 
-  // Garment Panel: Fetch fit check recommendation when product/size/preference changes
+  // Garment Panel: Fetch sizing from avatar engine when garment type or fit preference changes
   useEffect(() => {
-    if (!garmentPanelSelectedProductId) {
+    if (!avatarId) {
+      setGarmentPanelAvailableSizes([]);
+      setGarmentPanelRecommendedSize(null);
+      return;
+    }
+    if (avatarServiceOffline) {
+      setGarmentPanelAvailableSizes([]);
       setGarmentPanelRecommendedSize(null);
       return;
     }
 
     let cancelled = false;
+    setGarmentPanelSizingLoading(true);
 
-    api.fitCheck({
-      productId: garmentPanelSelectedProductId,
+    api.getAvatarSizing({
+      avatarId,
+      garmentType: garmentPanelGarmentType,
       fitPreference: garmentPanelFitPreference,
     })
       .then((res) => {
-        if (!cancelled && res.recommendedSize) {
-          // Map S/M/L/XL to XS/S/M/L/XL/XXL
-          const sizeMap: Record<string, AvatarGarmentSize> = {
-            XS: "XS",
-            S: "S",
-            M: "M",
-            L: "L",
-            XL: "XL",
-            XXL: "XXL",
-          };
-          setGarmentPanelRecommendedSize(sizeMap[res.recommendedSize] ?? "M");
-        } else if (!cancelled) {
-          setGarmentPanelRecommendedSize("M");
+        if (!cancelled) {
+          const sizes = res.sizes || [];
+          setGarmentPanelAvailableSizes(sizes);
+          const rec = res.recommended_size;
+          setGarmentPanelRecommendedSize(rec || null);
+
+          // Update selected size if current selection is not among available sizes
+          setGarmentPanelSelectedSize((prev) => {
+            if (sizes.some((s) => s.size === prev)) return prev;
+            return rec || sizes[0]?.size || "M";
+          });
         }
       })
       .catch(() => {
-        if (!cancelled) setGarmentPanelRecommendedSize("M");
+        if (!cancelled) {
+          setGarmentPanelAvailableSizes([]);
+          setGarmentPanelRecommendedSize(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGarmentPanelSizingLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [garmentPanelSelectedProductId, garmentPanelFitPreference]);
+  }, [avatarId, avatarServiceOffline, garmentPanelGarmentType, garmentPanelFitPreference]);
 
   // Garment Panel: Dress avatar
   const handleDressAvatar = useCallback(async () => {
@@ -524,6 +542,8 @@ export default function StyleStudioPage() {
       garmentType: garmentPanelGarmentType,
       size: garmentPanelSelectedSize,
       fitPreference: garmentPanelFitPreference,
+      colorHex: garmentPanelColorHex,
+      viewMode: garmentPanelViewMode,
     };
 
     try {
@@ -557,7 +577,7 @@ export default function StyleStudioPage() {
     } finally {
       setGarmentPanelLoading(false);
     }
-  }, [avatarId, avatarServiceOffline, garmentPanelGarmentType, garmentPanelSelectedProductId, garmentPanelSelectedSize, garmentPanelFitPreference, toast]);
+  }, [avatarId, avatarServiceOffline, garmentPanelGarmentType, garmentPanelSelectedProductId, garmentPanelSelectedSize, garmentPanelFitPreference, garmentPanelColorHex, garmentPanelViewMode, toast]);
 
   // Garment Panel: Remove garment
   const handleRemoveGarment = useCallback(() => {
@@ -1306,47 +1326,77 @@ export default function StyleStudioPage() {
                 )}
               </div>
 
-              {/* Size Buttons */}
+              {/* Size Buttons from Engine Sizing */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800">
-                  Size
-                </label>
-                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Garment size">
-                  {SIZE_OPTIONS.map((sz) => (
-                    <button
-                      key={sz}
-                      type="button"
-                      role="radio"
-                      aria-checked={garmentPanelSelectedSize === sz}
-                      onClick={() => setGarmentPanelSelectedSize(sz)}
-                      className={cn(
-                        "cursor-pointer min-h-10 min-w-[44px] rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
-                        garmentPanelSelectedSize === sz
-                          ? "bg-[#6633EE] border-[#6633EE] text-white"
-                          : garmentPanelRecommendedSize === sz
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-900"
-                          : "border-slate-300 bg-white text-slate-900 hover:border-violet-400 hover:bg-violet-50"
-                      )}
-                    >
-                      {sz}
-                      {garmentPanelRecommendedSize === sz && (
-                        <span
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Size
+                  </label>
+                  {garmentPanelSizingLoading && (
+                    <span className="flex items-center text-[11px] text-slate-500">
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin text-[#6633EE]" />
+                      Evaluating fit...
+                    </span>
+                  )}
+                </div>
+                {garmentPanelAvailableSizes.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Garment size">
+                    {garmentPanelAvailableSizes.map((s) => {
+                      const isSelected = garmentPanelSelectedSize === s.size;
+                      const isBest = garmentPanelRecommendedSize === s.size;
+                      return (
+                        <button
+                          key={s.size}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => setGarmentPanelSelectedSize(s.size)}
                           className={cn(
-                            "ml-1 text-[10px] font-normal",
-                            garmentPanelSelectedSize === sz ? "text-violet-200" : "text-emerald-700 font-semibold"
+                            "cursor-pointer min-h-10 min-w-[52px] rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE] flex items-center justify-center gap-1",
+                            isSelected
+                              ? "bg-[#6633EE] border-[#6633EE] text-white"
+                              : isBest
+                              ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                              : "border-slate-300 bg-white text-slate-900 hover:border-violet-400 hover:bg-violet-50"
                           )}
                         >
-                          Best
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                          <span>{s.size}</span>
+                          <span
+                            className={cn(
+                              "text-[10px] font-normal",
+                              isSelected ? "text-violet-200" : isBest ? "text-emerald-700 font-semibold" : "text-slate-500"
+                            )}
+                          >
+                            ({s.fit_score})
+                          </span>
+                          {isBest && (
+                            <span
+                              className={cn(
+                                "ml-0.5 rounded px-1 py-0.2 text-[9px] font-extrabold uppercase",
+                                isSelected ? "bg-white/20 text-white" : "bg-emerald-200/70 text-emerald-800"
+                              )}
+                            >
+                              Best
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-2.5 text-center text-xs text-slate-500">
+                    {avatarServiceOffline
+                      ? "Avatar service offline"
+                      : !avatarId
+                      ? "Create your avatar first"
+                      : garmentPanelSizingLoading
+                      ? "Loading available sizes..."
+                      : "No sizes available for this garment"}
+                  </div>
+                )}
                 {garmentPanelRecommendedSize && (
                   <p className="text-[11px] text-emerald-700">
-                    <span className="font-semibold">Best fit:</span>{" "}
-                    {garmentPanelRecommendedSize} (from Fit Check for your
-                    {garmentPanelFitPreference} preference)
+                    <span className="font-semibold">Best fit:</span> Size {garmentPanelRecommendedSize} recommended by avatar engine for {garmentPanelFitPreference} fit.
                   </p>
                 )}
               </div>
@@ -1376,6 +1426,95 @@ export default function StyleStudioPage() {
                   ))}
                 </div>
               </div>
+
+              {/* View Mode & Fabric Color Controls */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-2 border-t border-slate-100">
+                {/* View Mode Toggle */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-800">
+                    View Mode
+                  </label>
+                  <div className="flex rounded-lg border border-slate-300 bg-slate-100 p-0.5" role="radiogroup" aria-label="View mode">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={garmentPanelViewMode === "fabric"}
+                      onClick={() => setGarmentPanelViewMode("fabric")}
+                      className={cn(
+                        "cursor-pointer flex-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors text-center",
+                        garmentPanelViewMode === "fabric"
+                          ? "bg-[#6633EE] text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      Fabric View
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={garmentPanelViewMode === "heatmap"}
+                      onClick={() => setGarmentPanelViewMode("heatmap")}
+                      className={cn(
+                        "cursor-pointer flex-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors text-center",
+                        garmentPanelViewMode === "heatmap"
+                          ? "bg-[#6633EE] text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      Fit Heatmap
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fabric Color Swatches */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-800">
+                    Fabric Color
+                  </label>
+                  <div className="flex items-center gap-2 pt-0.5" role="radiogroup" aria-label="Fabric color">
+                    {FABRIC_COLOR_OPTIONS.map((swatch) => {
+                      const isSelected = garmentPanelColorHex.toLowerCase() === swatch.hex.toLowerCase();
+                      return (
+                        <button
+                          key={swatch.hex}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          aria-label={swatch.name}
+                          title={swatch.name}
+                          onClick={() => setGarmentPanelColorHex(swatch.hex)}
+                          className={cn(
+                            "cursor-pointer h-7 w-7 rounded-full border-2 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                            isSelected
+                              ? "border-white ring-2 ring-[#6633EE] scale-110 shadow-xs"
+                              : "border-slate-300 hover:scale-105"
+                          )}
+                          style={{ backgroundColor: swatch.hex }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Heatmap Legend */}
+              {garmentPanelViewMode === "heatmap" && (
+                <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600">
+                  <span className="font-semibold text-slate-700">Heatmap:</span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-[#ef4444]" /> Tight
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-[#f59e0b]" /> Snug
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-[#22c55e]" /> Ideal
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-[#38bdf8]" /> Relaxed / Loose
+                  </span>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
