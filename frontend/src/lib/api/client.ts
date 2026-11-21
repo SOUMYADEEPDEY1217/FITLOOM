@@ -1,4 +1,12 @@
-import { ApiError, ApiResponse } from "./types";
+import {
+  ApiError,
+  ApiResponse,
+  ProductsQuery,
+  ProductsResponse,
+  ProductResponse,
+  FitCheckInput,
+  FitCheckResponse,
+} from "./types";
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
   params?: Record<string, string | number | boolean | undefined>;
@@ -98,6 +106,24 @@ async function request<T>(
   return (json ?? null) as T;
 }
 
+export async function getProducts(
+  query?: ProductsQuery
+): Promise<ProductsResponse> {
+  return api.get<ProductsResponse>("/api/products", {
+    params: query as Record<string, string | number | boolean | undefined>,
+  });
+}
+
+export async function getProduct(id: string): Promise<ProductResponse> {
+  return api.get<ProductResponse>(`/api/products/${encodeURIComponent(id)}`);
+}
+
+export async function fitCheck(
+  body: FitCheckInput
+): Promise<FitCheckResponse> {
+  return api.post<FitCheckResponse>("/api/fit-check", body);
+}
+
 export const api = {
   get: <T>(url: string, options?: RequestOptions) =>
     request<T>(url, "GET", undefined, options),
@@ -109,6 +135,9 @@ export const api = {
     request<T>(url, "PATCH", body, options),
   delete: <T>(url: string, options?: RequestOptions) =>
     request<T>(url, "DELETE", undefined, options),
+  getProducts,
+  getProduct,
+  fitCheck,
 };
 
 export default api;

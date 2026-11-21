@@ -133,3 +133,131 @@ export interface AvatarPresetResponse {
   };
   createdAt: string;
 }
+
+// ==========================================
+// Catalogue & Products API Types
+// ==========================================
+
+export interface ProductsQuery {
+  page?: number;
+  limit?: number;
+  category?: string;
+  garmentType?: "tshirt" | "shirt" | "trousers" | "kurti";
+  search?: string;
+}
+
+export interface ProductItem {
+  id: string;
+  sellerPartnerId: string | null;
+  name: string;
+  description: string | null;
+  category: string;
+  garmentType: string | null;
+  fitType: string;
+  occasion: string;
+  color: string;
+  swatchHex: string;
+  imageUrl: string | null;
+  fabric: string;
+  stretchNote: string;
+  priceInr: number;
+  inventoryQty: number;
+  customFitEligible: boolean;
+  ratingAvg: number;
+  reviewCount: number;
+  status: string;
+  updatedAt: string;
+  sizes: string[];
+}
+
+export interface ProductsResponse {
+  products: ProductItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ProductMeasurement {
+  id: string;
+  size: string;
+  chestCm: number | null;
+  waistCm: number | null;
+  extraDimsCm: Record<string, number> | null;
+}
+
+export interface ProductDetailItem extends ProductItem {
+  chestMapCm: Record<string, number>;
+  waistMapCm: Record<string, number>;
+  measurements: ProductMeasurement[];
+}
+
+export interface ProductResponse {
+  product: ProductDetailItem;
+}
+
+// ==========================================
+// Fit-Check API Types
+// ==========================================
+
+export interface FitCheckInput {
+  productId: string;
+  size?: string;
+  fitPreference?: "slim" | "regular" | "relaxed" | "oversized";
+}
+
+export interface FitCheckSizeBreakdown {
+  size: string;
+  primaryGarmentCm: number;
+  primaryEaseCm: number;
+  secondaryGarmentCm: number | null;
+  secondaryEaseCm: number | null;
+  distanceFromTargetCm: number;
+  isRecommended: boolean;
+  statusNote: string;
+}
+
+export interface FitCheckAlternativeSize {
+  size: string;
+  relationship: string;
+  primaryEaseCm: number;
+  secondaryEaseCm: number | null;
+  note: string;
+}
+
+export interface FitCheckComparison {
+  fieldKey: string;
+  label: string;
+  compatibility: string;
+  bodyValueCm: number | null;
+  garmentValueCm: number | null;
+  easeCm: number | null;
+  targetEaseCm: number | null;
+  verdictLabel: string;
+  badgeVariant: string;
+  explanation: string;
+}
+
+export interface FitCheckResponse {
+  productId: string;
+  productName: string;
+  category: string;
+  garmentType: string | null;
+  fitPreference: string;
+  targetEaseCm: number;
+  recommendedSize: string | null;
+  selectedSize: string | null;
+  selectedSizeVerdict: FitCheckSizeBreakdown | null;
+  status: string;
+  sizeBreakdown: FitCheckSizeBreakdown[];
+  alternativeSizes: FitCheckAlternativeSize[];
+  comparisons: FitCheckComparison[];
+  summaryHeadline: string;
+  reasoning: string[];
+  evidenceSummary: string;
+  escalateToCustomFit: boolean;
+  escalationReason: string | null;
+}
+
