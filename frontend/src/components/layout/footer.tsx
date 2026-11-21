@@ -12,7 +12,7 @@ const FOOTER_COLUMNS = [
   {
     heading: "PRODUCTS",
     links: [
-      { label: "VIRTUAL TRY-ON", href: "/try-on" },
+      { label: "VIRTUAL TRY-ON (COMING SOON)", href: "/try-on" },
       { label: "FIT INTELLIGENCE", href: "/fit-check" },
       { label: "STYLE DNA", href: "/studio" },
       { label: "WARDROBE AI", href: "/saved-looks" },
