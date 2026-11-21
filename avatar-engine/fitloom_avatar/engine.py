@@ -4,6 +4,7 @@ import numpy as np, torch
 from PIL import Image, ImageOps
 from fitloom_avatar.geometry import build_smpl_poses, export_glb
 from fitloom_avatar.measurements import compute_measurements
+from fitloom_avatar.config import PARE_DIR, MODEL_PATH
 
 
 def _prep_image(src_path, dst_path):
@@ -28,11 +29,11 @@ def _pare_args(out_dir):
 class AvatarEngine:
     def __init__(
         self,
-        pare_dir="/home/krishu/FITLOOM-PRIVATE-AVATAR/PARE",
-        model_path="/home/krishu/FITLOOM-PRIVATE-AVATAR/data/body_models_300",
+        pare_dir=None,
+        model_path=None,
     ):
-        self.pare_dir = os.path.abspath(pare_dir)
-        self.model_path = os.path.abspath(model_path)
+        self.pare_dir = os.path.abspath(pare_dir or PARE_DIR)
+        self.model_path = os.path.abspath(model_path or MODEL_PATH)
         self._lock = threading.Lock()
         self._tester = None
         self._crop_fn = None

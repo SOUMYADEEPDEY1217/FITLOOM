@@ -4,6 +4,7 @@ import cv2, numpy as np, torch
 from PIL import Image, ImageOps
 from fitloom_avatar.geometry import build_smpl_poses, export_glb
 from fitloom_avatar.measurements import compute_measurements
+from fitloom_avatar.config import MODEL_PATH, PARE_DIR
 
 
 def _prep_image(src_path, dst_path):
@@ -34,8 +35,8 @@ def main():
     ap.add_argument("--height_cm", type=float, default=None, help="User height in cm for calibration")
     ap.add_argument("--front_weight", type=float, default=0.6, help="Front beta weight (0..1)")
     ap.add_argument("--a_pose_deg", type=float, default=40.0)
-    ap.add_argument("--model_path", default="/home/krishu/FITLOOM-PRIVATE-AVATAR/data/body_models_300")
-    ap.add_argument("--pare_dir", default="/home/krishu/FITLOOM-PRIVATE-AVATAR/PARE")
+    ap.add_argument("--model_path", default=MODEL_PATH)
+    ap.add_argument("--pare_dir", default=PARE_DIR)
     args = ap.parse_args()
 
     front_abs = os.path.abspath(args.front)

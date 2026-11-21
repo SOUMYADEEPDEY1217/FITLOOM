@@ -1,4 +1,5 @@
 import argparse, glob, os, shutil, subprocess, sys
+from fitloom_avatar.config import PARE_DIR
 
 
 def main():
@@ -8,7 +9,7 @@ def main():
     ap.add_argument("--gender", default="neutral", choices=["neutral", "male", "female"])
     ap.add_argument("--height_cm", type=float, default=None)
     ap.add_argument("--a_pose_deg", type=float, default=40.0)
-    ap.add_argument("--pare_dir", default="/home/krishu/FITLOOM-PRIVATE-AVATAR/PARE")
+    ap.add_argument("--pare_dir", default=PARE_DIR)
     ap.add_argument("--keep_tmp", action="store_true", help="Keep PARE temporary PNG frames")
     args = ap.parse_args()
 
