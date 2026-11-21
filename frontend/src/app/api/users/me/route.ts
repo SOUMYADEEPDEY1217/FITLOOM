@@ -29,26 +29,19 @@ export const GET = createApiHandler(
 
     const user = userRecords[0];
 
-    // Check if user is also an approved partner
     const partnerList = await db
       .select({
-        id: partners.id,
-        name: partners.name,
         type: partners.type,
-        city: partners.city,
         verificationStatus: partners.verificationStatus,
         operationalStatus: partners.operationalStatus,
       })
       .from(partners)
-      .where(eq(partners.ownerUserId, userId))
-      .limit(1);
-
-    const partner = partnerList.length > 0 ? partnerList[0] : null;
+      .where(eq(partners.ownerUserId, userId));
 
     return {
       user,
-      roles: ctx.roles,
-      partner,
+      capabilities: ctx.roles,
+      partners: partnerList,
     };
   },
   {
@@ -86,6 +79,7 @@ export const PATCH = createApiHandler(
         city: users.city,
         image: users.image,
         accountStatus: users.accountStatus,
+        createdAt: users.createdAt,
         updatedAt: users.updatedAt,
       });
 
@@ -93,7 +87,20 @@ export const PATCH = createApiHandler(
       throw new ApiError(404, "USER_NOT_FOUND", "User not found");
     }
 
-    return updated[0];
+    const partnerList = await db
+      .select({
+        type: partners.type,
+        verificationStatus: partners.verificationStatus,
+        operationalStatus: partners.operationalStatus,
+      })
+      .from(partners)
+      .where(eq(partners.ownerUserId, userId));
+
+    return {
+      user: updated[0],
+      capabilities: ctx.roles,
+      partners: partnerList,
+    };
   },
   {
     authRequired: true,

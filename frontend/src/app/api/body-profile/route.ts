@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { createApiHandler } from "@/server/api/handler";
 import { db } from "@/server/db";
 import { bodyProfiles, measurementHistory } from "@/server/db/schema";
@@ -8,6 +8,31 @@ import { StrictBodyProfileSchema } from "@/server/api/schemas";
 function round01(val: number | undefined): number | undefined {
   if (val === undefined || val === null) return undefined;
   return Math.round(val * 10) / 10;
+}
+
+async function getMeasurementHistory(userId: string) {
+  const rows = await db
+    .select({
+      id: measurementHistory.id,
+      chestCm: measurementHistory.chestCm,
+      waistCm: measurementHistory.waistCm,
+      note: measurementHistory.note,
+      recordedAt: measurementHistory.recordedAt,
+      fullSnapshot: measurementHistory.fullSnapshot,
+    })
+    .from(measurementHistory)
+    .where(eq(measurementHistory.userId, userId))
+    .orderBy(desc(measurementHistory.recordedAt))
+    .limit(5);
+
+  return rows.map((r) => ({
+    id: r.id,
+    chestCm: Number(r.chestCm),
+    waistCm: Number(r.waistCm),
+    note: r.note,
+    recordedAt: r.recordedAt,
+    fullSnapshot: r.fullSnapshot,
+  }));
 }
 
 export const GET = createApiHandler(
@@ -20,12 +45,17 @@ export const GET = createApiHandler(
       .where(eq(bodyProfiles.userId, userId))
       .limit(1);
 
+    const history = await getMeasurementHistory(userId);
+
     if (profileList.length === 0) {
-      return null;
+      return {
+        profile: null,
+        history,
+      };
     }
 
     const p = profileList[0];
-    return {
+    const profile = {
       userId: p.userId,
       heightCm: Number(p.heightCm),
       weightKg: p.weightKg ? Number(p.weightKg) : undefined,
@@ -38,6 +68,11 @@ export const GET = createApiHandler(
       inseamCm: p.inseamCm ? Number(p.inseamCm) : undefined,
       fitPreference: p.fitPreference,
       updatedAt: p.updatedAt,
+    };
+
+    return {
+      profile,
+      history,
     };
   },
   {
@@ -133,7 +168,9 @@ export const PUT = createApiHandler(
       })
       .returning();
 
-    return {
+    const history = await getMeasurementHistory(userId);
+
+    const profile = {
       userId: savedProfile.userId,
       heightCm: Number(savedProfile.heightCm),
       weightKg: savedProfile.weightKg ? Number(savedProfile.weightKg) : undefined,
@@ -146,6 +183,11 @@ export const PUT = createApiHandler(
       inseamCm: savedProfile.inseamCm ? Number(savedProfile.inseamCm) : undefined,
       fitPreference: savedProfile.fitPreference,
       updatedAt: savedProfile.updatedAt,
+    };
+
+    return {
+      profile,
+      history,
     };
   },
   {
