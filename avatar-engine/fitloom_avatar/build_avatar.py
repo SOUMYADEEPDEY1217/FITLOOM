@@ -2,6 +2,7 @@ import argparse, json, os
 import joblib, numpy as np
 from fitloom_avatar.geometry import build_smpl_poses, export_glb
 from fitloom_avatar.measurements import compute_measurements
+from fitloom_avatar.config import MODEL_PATH
 
 
 def select_primary_track(pare_dict):
@@ -23,7 +24,7 @@ def main():
     ap = argparse.ArgumentParser(description="Build modular FITLOOM 3D avatar bundle from PARE output.")
     ap.add_argument("--pkl", required=True, help="Path to pare_output.pkl")
     ap.add_argument("--out_dir", required=True, help="Output avatar bundle folder")
-    ap.add_argument("--model_path", default="/home/krishu/FITLOOM-PRIVATE-AVATAR/data/body_models_300")
+    ap.add_argument("--model_path", default=MODEL_PATH)
     ap.add_argument("--gender", default="neutral", choices=["neutral", "male", "female"])
     ap.add_argument("--track_id", type=int, default=None)
     ap.add_argument("--a_pose_deg", type=float, default=40.0)
