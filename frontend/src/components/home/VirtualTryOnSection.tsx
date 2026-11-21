@@ -48,8 +48,8 @@ export function VirtualTryOnSection() {
         <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-10">
           {/* Left Explanatory Flow */}
           <div className="space-y-5 lg:col-span-6">
-            <span className="inline-flex items-center rounded-full border border-amber-300/45 bg-amber-400/15 px-2.5 py-0.5 text-xs font-semibold text-amber-100">
-              Visual Simulation · Mock Preview
+            <span className="inline-flex items-center rounded-full border border-violet-300/45 bg-violet-400/20 px-2.5 py-0.5 text-xs font-semibold text-violet-100">
+              Coming Soon · Visual Simulation
             </span>
 
             <h2
@@ -85,7 +85,7 @@ export function VirtualTryOnSection() {
                 href={isGuest ? "/login?next=%2Ftry-on" : "/try-on"}
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-center text-sm font-semibold text-[#1E1B4B] shadow-sm transition-colors hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#1E1B4B]"
               >
-                Open Simulated Try-On
+                Open Try-On Preview (Coming Soon)
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link

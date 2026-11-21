@@ -10,7 +10,7 @@ export const NAV_LINKS: readonly NavLinkItem[] = [
   { href: "/shop", label: "Shop" },
   { href: "/studio", label: "Style Studio" },
   { href: "/fit-check", label: "Fit Check" },
-  { href: "/try-on", label: "Try-On" },
+  { href: "/try-on", label: "Try-On (Coming Soon)" },
   { href: "/customfit", label: "CUSTOMFIT" },
   { href: "/tailor", label: "For Tailors" },
   { href: "/about", label: "About" },

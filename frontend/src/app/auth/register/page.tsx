@@ -27,7 +27,7 @@ type RegisterFieldErrors = Partial<
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { user, loginMock, logoutMock, toast } = useFitloom();
+  const { user, signUp, loginMock, logoutMock, toast } = useFitloom();
 
   const [roleChoice, setRoleChoice] = useState<RegisterRoleChoice>("customer");
   const [name, setName] = useState("");
@@ -44,7 +44,7 @@ export default function RegisterPage() {
     };
   }, []);
 
-  function handleRegister(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (isSubmitting) return;
 
@@ -57,13 +57,43 @@ export default function RegisterPage() {
       toast({
         type: "error",
         title: "Check Registration Fields",
-        message: "Please fix the highlighted fields before creating your demo account.",
+        message:
+          "Please fix the highlighted fields before creating your account.",
       });
       return;
     }
 
     setErrors({});
     setIsSubmitting(true);
+
+    if (roleChoice === "customer") {
+      const result = await signUp(
+        parsed.data.name,
+        parsed.data.email,
+        parsed.data.password
+      );
+      setIsSubmitting(false);
+      if (result.ok) {
+        toast({
+          type: "success",
+          title: "Account Created",
+          message: `Welcome, ${parsed.data.name}! Let's calibrate your Body Profile next.`,
+        });
+        const nextParam =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("next")
+            : null;
+        router.push(sanitizeRedirectPath(nextParam, "/body-profile"));
+      } else {
+        if (result.fieldErrors) setErrors(result.fieldErrors);
+        toast({
+          type: "error",
+          title: "Registration Failed",
+          message: result.error || "Unable to create account. Please try again.",
+        });
+      }
+      return;
+    }
 
     timerRef.current = setTimeout(() => {
       loginMock({
@@ -75,22 +105,16 @@ export default function RegisterPage() {
       toast({
         type: "success",
         title: "Demo Account Created",
-        message:
-          roleChoice === "customer"
-            ? `Welcome, ${parsed.data.name}! Let's calibrate your Body Profile next.`
-            : `Welcome, ${parsed.data.name}! ${getRoleDisplayLabel(
-                roleChoice
-              )} demo session started.`,
+        message: `Welcome, ${parsed.data.name}! ${getRoleDisplayLabel(
+          roleChoice
+        )} demo session started.`,
       });
 
       const nextParam =
         typeof window !== "undefined"
           ? new URLSearchParams(window.location.search).get("next")
           : null;
-      const fallback =
-        roleChoice === "customer"
-          ? "/shop"
-          : getDefaultLandingRouteForRole(roleChoice);
+      const fallback = getDefaultLandingRouteForRole(roleChoice);
       router.push(sanitizeRedirectPath(nextParam, fallback));
     }, 250);
   }

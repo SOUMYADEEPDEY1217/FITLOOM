@@ -23,7 +23,7 @@ function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next");
-  const { loginMock, toast } = useFitloom();
+  const { signIn, loginMock, toast } = useFitloom();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +37,7 @@ function LoginFormContent() {
     email?: string;
   } | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isSubmitting) return;
 
@@ -58,16 +58,27 @@ function LoginFormContent() {
     setErrors({});
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmittedStatus({ valid: true, email: parsed.data.email });
+    const result = await signIn(email, password);
+    setIsSubmitting(false);
+
+    if (result.ok) {
       toast({
-        type: "info",
-        title: "Demo Authentication Scope",
-        message:
-          "Input validated. Live authentication infrastructure is scheduled for Phase P3.",
+        type: "success",
+        title: "Signed In",
+        message: "Welcome back to FITLOOM.",
       });
-    }, 300);
+      const destination = sanitizeRedirectPath(nextParam, "/shop");
+      router.push(destination);
+    } else {
+      if (result.fieldErrors) {
+        setErrors(result.fieldErrors);
+      }
+      toast({
+        type: "error",
+        title: "Sign-In Failed",
+        message: result.error || "Invalid email or password.",
+      });
+    }
   }
 
   function handleDemoCustomerLogin() {
@@ -284,7 +295,7 @@ function LoginFormContent() {
           </Link>
         </p>
         <p className="mt-3 text-[11px] text-slate-400">
-          Frontend demonstration scope — backend authentication scheduled for Phase P3.
+          Secure authentication session powered by FITLOOM Better Auth engine.
         </p>
       </div>
     </AuthSplitShowcase>

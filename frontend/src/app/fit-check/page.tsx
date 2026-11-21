@@ -591,7 +591,7 @@ export default function FitCheckPage() {
                 >
                   <Button variant="outline" size="sm" className="w-full">
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    Virtual Try-On
+                    Try-On (Coming Soon)
                   </Button>
                 </Link>
                 <Link

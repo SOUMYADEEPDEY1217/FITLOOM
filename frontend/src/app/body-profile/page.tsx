@@ -241,7 +241,7 @@ export default function BodyProfilePage() {
     });
   }
 
-  function handleSaveSubmit(e: React.FormEvent) {
+  async function handleSaveSubmit(e: React.FormEvent) {
     e.preventDefault();
     const validation = validateAndBuildBodyProfile(draft);
 
@@ -268,9 +268,15 @@ export default function BodyProfilePage() {
     const note = hasBodyProfile
       ? "Updated Body Profile measurements"
       : "Created Body Profile";
-    const result = updateBodyProfile(validation.data, note);
+    const result = await updateBodyProfile(validation.data, note);
 
     if (!result.ok) {
+      if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
+        setErrors((prev) => ({
+          ...prev,
+          ...(result.fieldErrors as Partial<Record<BodyProfileErrorKey, string>>),
+        }));
+      }
       toast({
         type: "error",
         title: "Save Failed",

@@ -135,7 +135,7 @@ export function FitIntelligenceSection() {
   const hasFitWarning =
     chestDelta < 4 || waistDelta < 4 || bodyProfile.hipCm > recWaistCm + 12;
 
-  function handleApplyCalibration(e: React.FormEvent) {
+  async function handleApplyCalibration(e: React.FormEvent) {
     e.preventDefault();
     const chestNum = Number(chestInput);
     if (Number.isNaN(chestNum) || !chestInput.trim()) {
@@ -150,7 +150,7 @@ export function FitIntelligenceSection() {
       });
       return;
     }
-    const res = updateBodyProfile(
+    const res = await updateBodyProfile(
       { ...bodyProfile, chestCm: chestNum, fitPreference: fitPref },
       "Homepage fit intelligence demo",
     );
