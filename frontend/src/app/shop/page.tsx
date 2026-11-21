@@ -16,15 +16,19 @@ import {
   CheckCircle2,
   Heart,
   Layers,
+  RotateCcw,
   Scissors,
   ShoppingBag,
   SlidersHorizontal,
   Sparkles,
   UserCheck,
   X,
+  AlertTriangle,
 } from "lucide-react";
-import { MockGarment, computeMockFitPreview } from "@/lib/mock-data";
+import { MockGarment, computeMockFitPreview, MOCK_GARMENTS, GarmentType } from "@/lib/mock-data";
+import { api, type ProductItem, type ProductsQuery } from "@/lib/api";
 import {
+  GarmentSize,
   INITIAL_SHOP_FILTERS,
   PRICE_RANGE_OPTIONS,
   PriceRangeKey,
@@ -96,27 +100,94 @@ export default function ShopPage() {
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const addTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [apiProducts, setApiProducts] = useState<ProductItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const queryParams: ProductsQuery = {
+        limit: 50,
+      };
+      if (filters.category && filters.category !== "All") {
+        queryParams.category = filters.category;
+      }
+      if (filters.garmentType && filters.garmentType !== "All") {
+        queryParams.garmentType = filters.garmentType as GarmentType;
+      }
+      if (filters.query.trim()) {
+        queryParams.search = filters.query.trim();
+      }
+      const res = await api.getProducts(queryParams);
+      setApiProducts(res?.products ?? []);
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Failed to load products from catalogue.";
+      setError(msg);
+      setApiProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters.category, filters.garmentType, filters.query]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
   useEffect(() => {
     return () => {
       if (addTimerRef.current) clearTimeout(addTimerRef.current);
     };
   }, []);
 
+  const loadedGarments = useMemo<MockGarment[]>(() => {
+    return apiProducts.map((p) => {
+      const mockMatch = MOCK_GARMENTS.find((m) => m.id === p.id);
+      return {
+        id: p.id,
+        name: p.name,
+        category: p.category as MockGarment["category"],
+        garmentType: (p.garmentType as GarmentType) ?? mockMatch?.garmentType,
+        fitType: p.fitType as MockGarment["fitType"],
+        occasion: p.occasion as MockGarment["occasion"],
+        color: p.color,
+        swatchHex: p.swatchHex,
+        image: p.imageUrl ?? mockMatch?.image ?? undefined,
+        fabric: p.fabric,
+        stretchNote: p.stretchNote,
+        priceInr: p.priceInr,
+        rating: p.ratingAvg,
+        reviewCount: p.reviewCount,
+        sizes:
+          (p.sizes as GarmentSize[]) ?? mockMatch?.sizes ?? ["S", "M", "L", "XL"],
+        chestMapCm:
+          mockMatch?.chestMapCm ?? { S: 94, M: 100, L: 106, XL: 112 },
+        waistMapCm:
+          mockMatch?.waistMapCm ?? { S: 82, M: 88, L: 94, XL: 100 },
+        description: p.description ?? mockMatch?.description ?? "",
+      };
+    });
+  }, [apiProducts]);
+
   const categoryCards = useMemo(
-    () => deriveCategoryDiscovery(eligibleCustomerGarments),
-    [eligibleCustomerGarments]
+    () => deriveCategoryDiscovery(loadedGarments),
+    [loadedGarments]
   );
   const facets = useMemo(
-    () => deriveFilterFacets(eligibleCustomerGarments),
-    [eligibleCustomerGarments]
+    () => deriveFilterFacets(loadedGarments),
+    [loadedGarments]
   );
   const orderedFitTypes = useMemo(
     () => orderFitTypes(facets.fitTypes),
     [facets.fitTypes]
   );
   const filteredGarments = useMemo(
-    () => filterAndSortGarments(eligibleCustomerGarments, filters),
-    [eligibleCustomerGarments, filters]
+    () => filterAndSortGarments(loadedGarments, filters),
+    [loadedGarments, filters]
   );
 
   const activeFilterCount = countActiveFilters(filters);
@@ -536,7 +607,30 @@ export default function ShopPage() {
 
           {/* Collapsible Refine Filters Bar */}
           {showRefineBar && (
-            <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#EAE2F8] bg-white p-4 shadow-2xs sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#EAE2F8] bg-white p-4 shadow-2xs sm:grid-cols-2 lg:grid-cols-5">
+              <div>
+                <label
+                  htmlFor="shop-garment-type-filter"
+                  className="block text-[11px] font-bold uppercase tracking-wider text-slate-500"
+                >
+                  Garment Type
+                </label>
+                <select
+                  id="shop-garment-type-filter"
+                  value={filters.garmentType}
+                  onChange={(e) =>
+                    updateFilters({ garmentType: e.target.value })
+                  }
+                  className="mt-1.5 h-9 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-[#1D0B24] focus:border-[#7E2DF2] focus:outline-none focus:ring-2 focus:ring-[#C4B5FD]"
+                >
+                  <option value="All">All Garment Types</option>
+                  <option value="shirt">Shirts</option>
+                  <option value="tshirt">T-Shirts</option>
+                  <option value="trousers">Trousers</option>
+                  <option value="kurti">Kurtis</option>
+                </select>
+              </div>
+
               <div>
                 <label
                   htmlFor="shop-price-filter"
@@ -642,8 +736,39 @@ export default function ShopPage() {
             </div>
           )}
 
-          {/* Product Grid */}
-          {filteredGarments.length === 0 ? (
+          {/* Product Grid / Error / Loading / Empty States */}
+          {error ? (
+            <div
+              role="alert"
+              className="rounded-3xl border border-red-200 bg-red-50/80 p-8 text-center sm:p-10"
+            >
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+                <AlertTriangle className="h-7 w-7" aria-hidden="true" />
+              </div>
+              <h2 className="mt-4 text-xl font-bold text-red-950">
+                Unable to Load Catalogue
+              </h2>
+              <p className="mt-1.5 text-sm text-red-700">{error}</p>
+              <Button
+                type="button"
+                onClick={fetchProducts}
+                className="mt-5 rounded-xl bg-red-600 text-white hover:bg-red-700"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+                Retry Loading
+              </Button>
+            </div>
+          ) : loading ? (
+            <div
+              role="status"
+              className="rounded-3xl border border-violet-100 bg-white p-12 text-center shadow-xs"
+            >
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-[#6633EE]" />
+              <p className="mt-4 text-sm font-semibold text-slate-700">
+                Loading products from catalogue...
+              </p>
+            </div>
+          ) : filteredGarments.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-[#DFD2F8] bg-white p-10 text-center">
               <p className="text-base font-bold text-[#1D0B24]">
                 No matching garments found

@@ -17,6 +17,7 @@ export interface ShopFilterState {
   size: string;
   priceRange: PriceRangeKey;
   sortBy: ShopSortKey;
+  garmentType: string;
 }
 
 export const INITIAL_SHOP_FILTERS: ShopFilterState = {
@@ -27,6 +28,7 @@ export const INITIAL_SHOP_FILTERS: ShopFilterState = {
   size: "All",
   priceRange: "all",
   sortBy: "default",
+  garmentType: "All",
 };
 
 export const PRICE_RANGE_OPTIONS: ReadonlyArray<{
@@ -82,12 +84,20 @@ export function deriveFilterFacets(garments: readonly MockGarment[]) {
   const fitTypes = Array.from(new Set(garments.map((g) => g.fitType)));
   const occasions = Array.from(new Set(garments.map((g) => g.occasion)));
   const sizes = Array.from(new Set(garments.flatMap((g) => g.sizes)));
+  const garmentTypes = Array.from(
+    new Set(
+      garments
+        .map((g) => g.garmentType)
+        .filter((gt): gt is NonNullable<MockGarment["garmentType"]> => Boolean(gt))
+    )
+  );
 
   return {
     categories: ["All", ...categories],
     fitTypes: ["All", ...fitTypes],
     occasions: ["All", ...occasions],
     sizes: ["All", ...sizes],
+    garmentTypes: ["All", ...garmentTypes],
   };
 }
 
@@ -126,6 +136,13 @@ export function filterAndSortGarments(
     }
 
     if (filters.category !== "All" && g.category !== filters.category) {
+      return false;
+    }
+    if (
+      filters.garmentType &&
+      filters.garmentType !== "All" &&
+      g.garmentType !== filters.garmentType
+    ) {
       return false;
     }
     if (filters.fitType !== "All" && g.fitType !== filters.fitType) {
@@ -282,6 +299,7 @@ export function countActiveFilters(filters: ShopFilterState): number {
   let count = 0;
   if (filters.query.trim()) count += 1;
   if (filters.category !== "All") count += 1;
+  if (filters.garmentType && filters.garmentType !== "All") count += 1;
   if (filters.fitType !== "All") count += 1;
   if (filters.occasion !== "All") count += 1;
   if (filters.size !== "All") count += 1;

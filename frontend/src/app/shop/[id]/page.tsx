@@ -1,6 +1,6 @@
 "use client";
 
-import React, { use, useEffect, useMemo, useRef, useState } from "react";
+import React, { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -14,6 +14,7 @@ import {
   Info,
   Layers,
   Palette,
+  RotateCcw,
   Ruler,
   Scissors,
   ShieldAlert,
@@ -21,7 +22,8 @@ import {
   Sparkles,
   Star,
 } from "lucide-react";
-import { MockGarment } from "@/lib/mock-data";
+import { MockGarment, GarmentType } from "@/lib/mock-data";
+import { api, type ProductDetailItem, ApiError } from "@/lib/api";
 import {
   MeasurementUnit,
   formatLengthFromCm,
@@ -56,10 +58,63 @@ export default function ProductDetailPage({
     toast,
   } = useFitloom();
 
-  const garment = useMemo(
-    () => eligibleCustomerGarments.find((g) => g.id === id),
-    [eligibleCustomerGarments, id]
-  );
+  const [productDetail, setProductDetail] = useState<ProductDetailItem | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState<boolean>(false);
+
+  const fetchProduct = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    setIsNotFound(false);
+    try {
+      const res = await api.getProduct(id);
+      if (res?.product) {
+        setProductDetail(res.product);
+      } else {
+        setIsNotFound(true);
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setIsNotFound(true);
+      } else {
+        const msg =
+          err instanceof Error ? err.message : "Failed to load product.";
+        setError(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchProduct();
+  }, [fetchProduct]);
+
+  const garment = useMemo<MockGarment | null>(() => {
+    if (!productDetail) return null;
+    return {
+      id: productDetail.id,
+      name: productDetail.name,
+      category: productDetail.category as MockGarment["category"],
+      garmentType: (productDetail.garmentType as GarmentType) ?? undefined,
+      fitType: productDetail.fitType as MockGarment["fitType"],
+      occasion: productDetail.occasion as MockGarment["occasion"],
+      color: productDetail.color,
+      swatchHex: productDetail.swatchHex,
+      image: productDetail.imageUrl ?? undefined,
+      fabric: productDetail.fabric,
+      stretchNote: productDetail.stretchNote,
+      priceInr: productDetail.priceInr,
+      rating: productDetail.ratingAvg,
+      reviewCount: productDetail.reviewCount,
+      sizes: productDetail.sizes as GarmentSize[],
+      chestMapCm: productDetail.chestMapCm as Record<GarmentSize, number>,
+      waistMapCm: productDetail.waistMapCm as Record<GarmentSize, number>,
+      description: productDetail.description ?? "",
+    };
+  }, [productDetail]);
 
   // Explicit size selection — never pre-selects a guessed default size
   const [selectedSize, setSelectedSize] = useState<GarmentSize | null>(null);
@@ -86,8 +141,56 @@ export default function ProductDetailPage({
     };
   }, []);
 
+  // Loading State
+  if (loading) {
+    return (
+      <div
+        role="status"
+        className="mx-auto max-w-xl space-y-6 py-16 text-center"
+      >
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-[#6633EE]" />
+        <p className="text-sm font-semibold text-slate-700">
+          Loading product details...
+        </p>
+      </div>
+    );
+  }
+
+  // Error State with Retry
+  if (error) {
+    return (
+      <div
+        role="alert"
+        className="mx-auto max-w-xl space-y-6 py-12 text-center"
+      >
+        <div className="rounded-3xl border border-red-200 bg-red-50/80 p-8 shadow-xs sm:p-10">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+            <AlertTriangle className="h-7 w-7" aria-hidden="true" />
+          </div>
+          <h1 className="mt-4 text-2xl font-extrabold text-red-950">
+            Failed to Load Product
+          </h1>
+          <p className="mt-2 text-sm text-red-700">{error}</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button
+              type="button"
+              onClick={fetchProduct}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Retry
+            </Button>
+            <Link href="/shop">
+              <Button variant="outline">Back to Shop Catalogue</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Section 11: Dedicated Not-Found State (no silent fallback to MOCK_GARMENTS[0])
-  if (!garment) {
+  if (isNotFound || !garment) {
     return (
       <div className="mx-auto max-w-xl space-y-6 py-8">
         <nav aria-label="Breadcrumb" className="text-xs text-slate-500">
