@@ -12,11 +12,21 @@ import React, {
 import {
   BodyProfile,
   BodyProfileSchema,
+  BodyType,
   FitPreference,
   INITIAL_MOCK_BODY_PROFILE,
   MOCK_GARMENTS,
   type MockGarment,
 } from "@/lib/mock-data";
+import {
+  api,
+  ApiError,
+  type UserMeResponse,
+  type BodyProfilePayload,
+  type BodyProfileResponse,
+  type AvatarStatusResponse,
+  type AvatarPresetResponse,
+} from "@/lib/api";
 import {
   ToastInput,
   ToastItem,
@@ -78,6 +88,12 @@ export interface MockUser {
   phone?: string;
   city?: string;
   memberSince?: string;
+  capabilities?: string[];
+  partners?: Array<{
+    type: string;
+    verificationStatus: string;
+    operationalStatus: string;
+  }>;
 }
 
 export interface MockCartItem {
@@ -158,10 +174,51 @@ interface FitloomContextValue {
     updates: Partial<Pick<MockUser, "name" | "email" | "phone" | "city">>
   ) => { ok: boolean; error?: string };
 
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{
+    ok: boolean;
+    error?: string;
+    fieldErrors?: Record<string, string>;
+  }>;
+  signUp: (
+    name: string,
+    email: string,
+    password: string
+  ) => Promise<{
+    ok: boolean;
+    error?: string;
+    fieldErrors?: Record<string, string>;
+  }>;
+  signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+  isLoadingAuth: boolean;
+
+  avatarId: string | null;
+  avatarAssets: {
+    apose: string;
+    tpose: string;
+    measurements: string;
+  } | null;
+  avatarServiceOffline: boolean;
+  isGeneratingAvatar: boolean;
+  checkAvatarStatus: () => Promise<boolean>;
+  generateAvatarPreset: (
+    gender?: "female" | "male" | "neutral"
+  ) => Promise<{ ok: boolean; error?: string; avatarId?: string }>;
+
   bodyProfile: BodyProfile;
   hasBodyProfile: boolean;
   measurementHistory: Array<{ date: string; chestCm: number; waistCm: number; note: string }>;
-  updateBodyProfile: (next: BodyProfile, note?: string) => { ok: boolean; error?: string };
+  updateBodyProfile: (
+    next: BodyProfile,
+    note?: string
+  ) => Promise<{
+    ok: boolean;
+    error?: string;
+    fieldErrors?: Partial<Record<string, string>>;
+  }>;
   updateFitPreference: (fitPreference: FitPreference) => { ok: boolean; error?: string };
   clearBodyProfile: () => void;
 
@@ -459,6 +516,192 @@ export function FitloomProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const placingOrderRef = useRef<boolean>(false);
 
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [avatarAssets, setAvatarAssets] = useState<{
+    apose: string;
+    tpose: string;
+    measurements: string;
+  } | null>(null);
+  const [avatarServiceOffline, setAvatarServiceOffline] = useState(false);
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+
+  const fetchBodyProfile = useCallback(async () => {
+    try {
+      const res = await api.get<BodyProfileResponse>("/api/body-profile");
+      if (res?.profile) {
+        setBodyProfile({
+          heightCm: res.profile.heightCm,
+          weightKg: res.profile.weightKg ?? undefined,
+          bodyType: (res.profile.bodyType as BodyType) ?? undefined,
+          chestCm: res.profile.chestCm,
+          waistCm: res.profile.waistCm,
+          hipCm: res.profile.hipCm ?? INITIAL_MOCK_BODY_PROFILE.hipCm,
+          shoulderCm:
+            res.profile.shoulderCm ?? INITIAL_MOCK_BODY_PROFILE.shoulderCm,
+          sleeveCm: res.profile.sleeveCm ?? INITIAL_MOCK_BODY_PROFILE.sleeveCm,
+          inseamCm: res.profile.inseamCm ?? INITIAL_MOCK_BODY_PROFILE.inseamCm,
+          fitPreference:
+            (res.profile.fitPreference as FitPreference) ?? "regular",
+        });
+        setHasBodyProfile(true);
+      } else {
+        setHasBodyProfile(false);
+      }
+      if (res?.history && res.history.length > 0) {
+        setMeasurementHistory(
+          res.history.map((h) => ({
+            date: h.recordedAt ? h.recordedAt.slice(0, 10) : getTodayIsoDate(),
+            chestCm: h.chestCm,
+            waistCm: h.waistCm,
+            note: h.note || "Recorded measurement",
+          }))
+        );
+      }
+    } catch {
+      // Unauthenticated or profile fetch failed
+    }
+  }, []);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      const res = await api.get<UserMeResponse>("/api/users/me");
+      if (res?.user) {
+        let role: MockRole = "customer";
+        if (res.capabilities?.includes("admin")) role = "admin";
+        else if (res.capabilities?.includes("seller")) role = "seller";
+        else if (res.capabilities?.includes("tailor")) role = "tailor";
+
+        setUser({
+          id: res.user.id,
+          name: res.user.name,
+          email: res.user.email,
+          phone: res.user.phone ?? undefined,
+          city: res.user.city ?? undefined,
+          role,
+          capabilities: res.capabilities,
+          partners: res.partners,
+        });
+        await fetchBodyProfile();
+      }
+    } catch {
+      // 401 or no active session
+      setUser({
+        id: undefined,
+        name: "Guest",
+        email: "",
+        role: "guest",
+      });
+      setHasBodyProfile(false);
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  }, [fetchBodyProfile]);
+
+  useEffect(() => {
+    refreshSession();
+  }, [refreshSession]);
+
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      try {
+        await api.post("/api/auth/sign-in/email", { email, password });
+        await refreshSession();
+        return { ok: true };
+      } catch (err: unknown) {
+        if (err instanceof ApiError) {
+          return {
+            ok: false,
+            error: err.message,
+            fieldErrors: err.fieldErrors,
+          };
+        }
+        return {
+          ok: false,
+          error: "Sign-in failed. Please check your credentials.",
+        };
+      }
+    },
+    [refreshSession]
+  );
+
+  const signUp = useCallback(
+    async (name: string, email: string, password: string) => {
+      try {
+        await api.post("/api/auth/sign-up/email", { name, email, password });
+        await refreshSession();
+        return { ok: true };
+      } catch (err: unknown) {
+        if (err instanceof ApiError) {
+          return {
+            ok: false,
+            error: err.message,
+            fieldErrors: err.fieldErrors,
+          };
+        }
+        return {
+          ok: false,
+          error: "Registration failed. Please check your details.",
+        };
+      }
+    },
+    [refreshSession]
+  );
+
+  const signOut = useCallback(async () => {
+    try {
+      await api.post("/api/auth/sign-out", {});
+    } catch {
+      // Ignore network errors on signout
+    }
+    setUser({ id: undefined, name: "Guest", email: "", role: "guest" });
+    setHasBodyProfile(false);
+    setAvatarId(null);
+    setAvatarAssets(null);
+  }, []);
+
+  const checkAvatarStatus = useCallback(async () => {
+    try {
+      const res = await api.get<AvatarStatusResponse>("/api/avatar/status");
+      if (res?.status === "ok") {
+        setAvatarServiceOffline(false);
+        return true;
+      }
+      setAvatarServiceOffline(true);
+      return false;
+    } catch {
+      setAvatarServiceOffline(true);
+      return false;
+    }
+  }, []);
+
+  const generateAvatarPreset = useCallback(
+    async (gender: "female" | "male" | "neutral" = "neutral") => {
+      setIsGeneratingAvatar(true);
+      try {
+        const res = await api.post<AvatarPresetResponse>("/api/avatar/preset", {
+          gender,
+        });
+        setAvatarId(res.avatarId);
+        setAvatarAssets(res.assets);
+        setAvatarServiceOffline(false);
+        return { ok: true, avatarId: res.avatarId };
+      } catch (err: unknown) {
+        if (err instanceof ApiError) {
+          if (err.status === 503) {
+            setAvatarServiceOffline(true);
+          }
+          return { ok: false, error: err.message };
+        }
+        setAvatarServiceOffline(true);
+        return { ok: false, error: "Avatar service temporarily unavailable" };
+      } finally {
+        setIsGeneratingAvatar(false);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     placingOrderRef.current = false;
   }, [orders]);
@@ -556,7 +799,7 @@ export function FitloomProvider({ children }: { children: React.ReactNode }) {
   }
 
   function logoutMock() {
-    setUser({ id: undefined, name: "Guest", email: "", role: "guest" });
+    signOut();
   }
 
   function switchRole(role: MockRole) {
@@ -634,27 +877,90 @@ export function FitloomProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }
 
-  function updateBodyProfile(next: BodyProfile, note = "Updated profile") {
-    const parsed = BodyProfileSchema.safeParse(next);
-    if (!parsed.success) {
-      return {
-        ok: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid measurements",
-      };
-    }
-    setBodyProfile(parsed.data);
-    setHasBodyProfile(true);
-    setMeasurementHistory((prev) => [
-      {
-        date: getTodayIsoDate(),
-        chestCm: parsed.data.chestCm,
-        waistCm: parsed.data.waistCm,
-        note,
-      },
-      ...prev.slice(0, 4),
-    ]);
-    return { ok: true };
-  }
+  const updateBodyProfile = useCallback(
+    async (next: BodyProfile, note = "Updated profile") => {
+      const parsed = BodyProfileSchema.safeParse(next);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          error: parsed.error.issues[0]?.message ?? "Invalid measurements",
+        };
+      }
+
+      // If user is guest or demo without real DB account, update local state
+      if (
+        user.role === "guest" ||
+        !user.id ||
+        user.id.startsWith("customer-riya-demo") ||
+        user.id.startsWith("user-")
+      ) {
+        setBodyProfile(parsed.data);
+        setHasBodyProfile(true);
+        setMeasurementHistory((prev) => [
+          {
+            date: getTodayIsoDate(),
+            chestCm: parsed.data.chestCm,
+            waistCm: parsed.data.waistCm,
+            note,
+          },
+          ...prev.slice(0, 4),
+        ]);
+      }
+
+      try {
+        const payload: BodyProfilePayload = {
+          heightCm: parsed.data.heightCm,
+          weightKg: parsed.data.weightKg,
+          bodyType: parsed.data.bodyType,
+          chestCm: parsed.data.chestCm,
+          waistCm: parsed.data.waistCm,
+          hipCm: parsed.data.hipCm,
+          shoulderCm: parsed.data.shoulderCm,
+          sleeveCm: parsed.data.sleeveCm,
+          inseamCm: parsed.data.inseamCm,
+          fitPreference: parsed.data.fitPreference,
+        };
+
+        const res = await api.put<BodyProfileResponse>(
+          "/api/body-profile",
+          payload
+        );
+        setBodyProfile(parsed.data);
+        setHasBodyProfile(true);
+        if (res?.history && res.history.length > 0) {
+          setMeasurementHistory(
+            res.history.map((h) => ({
+              date: h.recordedAt ? h.recordedAt.slice(0, 10) : getTodayIsoDate(),
+              chestCm: h.chestCm,
+              waistCm: h.waistCm,
+              note: h.note || note,
+            }))
+          );
+        } else {
+          setMeasurementHistory((prev) => [
+            {
+              date: getTodayIsoDate(),
+              chestCm: parsed.data.chestCm,
+              waistCm: parsed.data.waistCm,
+              note,
+            },
+            ...prev.slice(0, 4),
+          ]);
+        }
+        return { ok: true };
+      } catch (err: unknown) {
+        if (err instanceof ApiError) {
+          return {
+            ok: false,
+            error: err.message,
+            fieldErrors: err.fieldErrors as Partial<Record<string, string>>,
+          };
+        }
+        return { ok: false, error: "Failed to save profile to server." };
+      }
+    },
+    [user.id, user.role]
+  );
 
   function updateFitPreference(fitPreference: FitPreference): {
     ok: boolean;
@@ -1653,6 +1959,17 @@ export function FitloomProvider({ children }: { children: React.ReactNode }) {
         logoutMock,
         switchRole,
         updateUserProfile,
+        signIn,
+        signUp,
+        signOut,
+        refreshSession,
+        isLoadingAuth,
+        avatarId,
+        avatarAssets,
+        avatarServiceOffline,
+        isGeneratingAvatar,
+        checkAvatarStatus,
+        generateAvatarPreset,
         bodyProfile,
         hasBodyProfile,
         measurementHistory,
