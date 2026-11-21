@@ -99,8 +99,8 @@ All endpoints return `{ ok: true, data }` or `{ ok: false, error: { code, messag
 | `/api/auth/logout` | `POST` | Auth | — | `200` clears HTTP-only session cookie |
 | `/api/users/me` | `GET`, `PATCH` | Auth | `ProfileFormSchema` | Returns profile, `capabilities[]`, and linked partner verification/operational status (`BE-004`) |
 | `/api/body-profile` | `GET`, `PUT` | Cap: `customer` | `BodyProfileSchema` (`0.1 cm` canonical) | `200 { profile, history }` (`BE-005`) |
-| `/api/products` & `/[id]` | `GET` | Public | Query filters / Path `id` | Eligible active/approved catalogue (`numeric 6,1` size specs) / `404 PRODUCT_NOT_FOUND` |
-| `/api/fit-check` | `POST` | Cap: `customer` | `{ productId, fitPreferenceOverride? }` | Deterministic `FitEvaluationResult` (`BE-007`) / `422 MISSING_BODY_PROFILE` |
+| `/api/products` & `/[id]` | `GET` | Public | Query: `page`, `limit`, `category`, `garmentType`, `search` / Path `id` | Eligible active/approved catalogue (`numeric 6,1` size specs) with sizes & measurements / `404 PRODUCT_NOT_FOUND` / `400 VALIDATION_ERROR` |
+| `/api/fit-check` | `POST` | Cap: `customer` | `{ productId, size?, fitPreference? }` | Deterministic `FitEvaluationResult` with target ease (+5/+8/+12/+15 cm), per-size verdicts & recommended size (`BE-007`) / `422 MISSING_BODY_PROFILE` / `404 PRODUCT_NOT_FOUND` |
 | `/api/vton/jobs` & `/[id]` | `POST`, `GET` | Cap: `customer` (Owner) | Multipart `image` (`<= 10 MB`, JPEG/PNG/WebP + magic bytes) | Strips EXIF, private UUID key, signed short-lived result URL + Fallback Disclosure (`DEC-005`) |
 | `/api/saved-looks` & `/[id]` | `GET/POST/PATCH/DELETE` | Cap: `customer` (Owner) | `{ title, garmentIds[], source }` | `200` / `201` / `403 FORBIDDEN` (`BE-008`) |
 | `/api/cart` & `/[itemId]` | `GET/POST/PATCH/DELETE` | Cap: `customer` | `{ productId, size, quantity (1..10), customfitRequestId? }` | Deterministic upsert dedupe, qty `1..10`, availability check (`BE-009`) |
