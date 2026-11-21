@@ -1,25 +1,43 @@
 from fitloom_avatar.chart_parser import parse_custom_chart
-import os, shutil, tempfile, uuid
+import json, os, re, secrets, shutil, tempfile, uuid
 from typing import Optional
 import torch
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
+from starlette.responses import JSONResponse
 from fitloom_avatar.engine import AvatarEngine
 from fitloom_avatar.body_prior import fuse_pare_with_prior
-
-AVATARS_ROOT = os.environ.get(
-    "FITLOOM_AVATARS_DIR", "/home/krishu/FITLOOM-PRIVATE-AVATAR/outputs/api_avatars"
+from fitloom_avatar.config import (
+    ALLOWED_ORIGINS,
+    AVATARS_DIR,
+    AVATAR_SERVICE_TOKEN,
 )
+
+AVATARS_ROOT = AVATARS_DIR
 os.makedirs(AVATARS_ROOT, exist_ok=True)
 
 app = FastAPI(title="FITLOOM 3D Avatar Service", version="1.1.0")
+
+
+@app.middleware("http")
+async def auth_middleware(request, call_next):
+    if AVATAR_SERVICE_TOKEN and request.method != "OPTIONS" and request.url.path != "/health":
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        token = auth_header[7:].strip()
+        if not secrets.compare_digest(token, AVATAR_SERVICE_TOKEN):
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 engine = AvatarEngine()
 
@@ -65,7 +83,7 @@ def create_avatar_from_images(
     if weight_kg is not None and not (30.0 <= weight_kg <= 200.0):
         raise HTTPException(status_code=400, detail="weight_kg must be between 30 and 200")
 
-    avatar_id = uuid.uuid4().hex[:12]
+    avatar_id = uuid.uuid4().hex[:8]
     out_dir = os.path.join(AVATARS_ROOT, avatar_id)
     upload_dir = tempfile.mkdtemp(prefix="fitloom_up_")
     calibration = {"applied": False}
@@ -142,12 +160,28 @@ def create_avatar_from_images(
 
 
 def _safe_asset(avatar_id: str, filename: str) -> str:
-    if not avatar_id.isalnum():
+    if not re.fullmatch(r"^[a-f0-9]{8}$", avatar_id):
         raise HTTPException(status_code=400, detail="Invalid avatar_id")
-    path = os.path.join(AVATARS_ROOT, avatar_id, filename)
-    if not os.path.isfile(path):
+    is_allowed = (
+        filename in ("avatar_apose.glb", "avatar_tpose.glb", "measurements.json")
+        or bool(re.fullmatch(r"^garment_[a-z0-9_]+\.glb$", filename))
+    )
+    if not is_allowed:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    root_abs = os.path.abspath(AVATARS_ROOT)
+    target_abs = os.path.abspath(os.path.join(root_abs, avatar_id, filename))
+
+    try:
+        common = os.path.commonpath([root_abs, target_abs])
+        if common != root_abs or target_abs == root_abs:
+            raise HTTPException(status_code=400, detail="Path traversal detected")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    if not os.path.isfile(target_abs):
         raise HTTPException(status_code=404, detail="Asset not found")
-    return path
+    return target_abs
 
 
 @app.get("/avatars/{avatar_id}/apose.glb")
@@ -174,7 +208,7 @@ def customize_avatar(
     hip_cm: Optional[float] = Form(None),
     a_pose_deg: float = Form(40.0),
 ):
-    if not avatar_id.isalnum():
+    if not re.fullmatch(r"^[a-f0-9]{8}$", avatar_id):
         raise HTTPException(status_code=400, detail="Invalid avatar_id")
     out_dir = os.path.join(AVATARS_ROOT, avatar_id)
     if not os.path.isdir(out_dir):
@@ -231,7 +265,6 @@ def demo_ui():
 def root_redirect():
     return RedirectResponse(url="/demo")
 
-import json, re
 from fitloom_avatar.sizing import evaluate_garment_sizes
 from fitloom_avatar.garments import generate_garment_glb
 
@@ -254,7 +287,7 @@ def post_sizing(avatar_id: str, garment_type: str = Form("tshirt"), fit_preferen
 
 @app.post("/avatars/{avatar_id}/dress")
 def dress_avatar(avatar_id: str, garment_type: str = Form("tshirt"), size: Optional[str] = Form(None), fit_preference: str = Form("regular"), view_mode: str = Form("fabric"), color_hex: str = Form("#2563eb"), custom_chart: str = Form(""), chart_unit: str = Form("in"), chart_type: str = Form("garment")):
-    if not avatar_id.isalnum():
+    if not re.fullmatch(r"^[a-f0-9]{8}$", avatar_id):
         raise HTTPException(status_code=400, detail="Invalid avatar_id")
     out_dir = os.path.join(AVATARS_ROOT, avatar_id)
     if not os.path.isdir(out_dir):
