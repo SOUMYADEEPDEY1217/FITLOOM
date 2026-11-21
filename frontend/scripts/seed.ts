@@ -75,10 +75,17 @@ export async function seed() {
 
   console.log("🌱 Starting idempotent database seeding for FITLOOM Stage P3-B...");
   const db = getDb();
+  const catalogueOnly =
+    process.env.SEED_CATALOGUE_ONLY === "1" ||
+    process.env.SEED_CATALOGUE_ONLY === "true";
 
-  // 1. Seed Core Demo Users
-  console.log("  -> Seeding demo users...");
-  const demoUsers = [
+  if (catalogueOnly) {
+    console.log("  🔒 [PROD_MODE] SEED_CATALOGUE_ONLY=1: Skipping demo customer/admin accounts and body profiles.");
+  }
+
+  // 1. Seed Partner & Demo Users
+  console.log("  -> Seeding user records...");
+  const allUsers = [
     {
       id: USER_RIYA_ID,
       name: "Riya Sen",
@@ -86,6 +93,7 @@ export async function seed() {
       accountStatus: "active",
       city: "Kolkata",
       phone: "+91 98300 12345",
+      isDemoOnly: true,
     },
     {
       id: USER_SELLER_ID,
@@ -94,6 +102,7 @@ export async function seed() {
       accountStatus: "active",
       city: "Mumbai",
       phone: "+91 98200 54321",
+      isDemoOnly: false,
     },
     {
       id: USER_TAILOR_ARJUN_ID,
@@ -102,6 +111,7 @@ export async function seed() {
       accountStatus: "active",
       city: "Kolkata",
       phone: "+91 98311 98765",
+      isDemoOnly: false,
     },
     {
       id: USER_ADMIN_ID,
@@ -110,6 +120,7 @@ export async function seed() {
       accountStatus: "active",
       city: "Bengaluru",
       phone: "+91 98450 11223",
+      isDemoOnly: true,
     },
     {
       id: USER_TAILOR_MEERA_ID,
@@ -118,6 +129,7 @@ export async function seed() {
       accountStatus: "active",
       city: "Bengaluru",
       phone: "+91 98440 22334",
+      isDemoOnly: false,
     },
     {
       id: USER_TAILOR_PARADOX_ID,
@@ -126,13 +138,25 @@ export async function seed() {
       accountStatus: "active",
       city: "Mumbai",
       phone: "+91 98210 99887",
+      isDemoOnly: false,
     },
   ];
 
-  for (const u of demoUsers) {
+  const usersToSeed = catalogueOnly
+    ? allUsers.filter((u) => !u.isDemoOnly)
+    : allUsers;
+
+  for (const u of usersToSeed) {
     await db
       .insert(users)
-      .values(u)
+      .values({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        accountStatus: u.accountStatus,
+        city: u.city,
+        phone: u.phone,
+      })
       .onConflictDoUpdate({
         target: users.id,
         set: {
@@ -146,19 +170,23 @@ export async function seed() {
 
   // 2. Seed User Roles (Additive Multi-Role Model)
   console.log("  -> Seeding user roles...");
-  const rolesToSeed = [
-    { userId: USER_RIYA_ID, role: "customer" },
-    { userId: USER_SELLER_ID, role: "customer" },
-    { userId: USER_SELLER_ID, role: "seller" },
-    { userId: USER_TAILOR_ARJUN_ID, role: "customer" },
-    { userId: USER_TAILOR_ARJUN_ID, role: "tailor" },
-    { userId: USER_TAILOR_MEERA_ID, role: "customer" },
-    { userId: USER_TAILOR_MEERA_ID, role: "tailor" },
-    { userId: USER_TAILOR_PARADOX_ID, role: "customer" },
-    { userId: USER_TAILOR_PARADOX_ID, role: "tailor" },
-    { userId: USER_ADMIN_ID, role: "customer" },
-    { userId: USER_ADMIN_ID, role: "admin" },
+  const allRoles = [
+    { userId: USER_RIYA_ID, role: "customer", isDemoOnly: true },
+    { userId: USER_SELLER_ID, role: "customer", isDemoOnly: false },
+    { userId: USER_SELLER_ID, role: "seller", isDemoOnly: false },
+    { userId: USER_TAILOR_ARJUN_ID, role: "customer", isDemoOnly: false },
+    { userId: USER_TAILOR_ARJUN_ID, role: "tailor", isDemoOnly: false },
+    { userId: USER_TAILOR_MEERA_ID, role: "customer", isDemoOnly: false },
+    { userId: USER_TAILOR_MEERA_ID, role: "tailor", isDemoOnly: false },
+    { userId: USER_TAILOR_PARADOX_ID, role: "customer", isDemoOnly: false },
+    { userId: USER_TAILOR_PARADOX_ID, role: "tailor", isDemoOnly: false },
+    { userId: USER_ADMIN_ID, role: "customer", isDemoOnly: true },
+    { userId: USER_ADMIN_ID, role: "admin", isDemoOnly: true },
   ];
+
+  const rolesToSeed = catalogueOnly
+    ? allRoles.filter((r) => !r.isDemoOnly)
+    : allRoles;
 
   for (const r of rolesToSeed) {
     await db
@@ -274,25 +302,12 @@ export async function seed() {
   }
 
   // 5. Seed Anthropometric Body Profile (Riya Sen — matches INITIAL_MOCK_BODY_PROFILE)
-  console.log("  -> Seeding customer body profile...");
-  await db
-    .insert(bodyProfiles)
-    .values({
-      userId: USER_RIYA_ID,
-      heightCm: "168.0",
-      weightKg: "58.0",
-      bodyType: "hourglass",
-      chestCm: "92.0",
-      waistCm: "70.0",
-      hipCm: "98.0",
-      shoulderCm: "40.0",
-      sleeveCm: "59.0",
-      inseamCm: "78.0",
-      fitPreference: "regular",
-    })
-    .onConflictDoUpdate({
-      target: bodyProfiles.userId,
-      set: {
+  if (!catalogueOnly) {
+    console.log("  -> Seeding customer body profile...");
+    await db
+      .insert(bodyProfiles)
+      .values({
+        userId: USER_RIYA_ID,
         heightCm: "168.0",
         weightKg: "58.0",
         bodyType: "hourglass",
@@ -303,47 +318,62 @@ export async function seed() {
         sleeveCm: "59.0",
         inseamCm: "78.0",
         fitPreference: "regular",
-      },
-    });
-
-  // 6. Seed Measurement History (Matches 5-entry log in FitloomProvider)
-  console.log("  -> Seeding measurement history log...");
-  const historyEntries = [
-    {
-      id: "30000000-0000-4000-a000-000000000001",
-      userId: USER_RIYA_ID,
-      chestCm: "92.0",
-      waistCm: "70.0",
-      note: "Initial profile calibration (Fit Intelligence setup)",
-    },
-    {
-      id: "30000000-0000-4000-a000-000000000002",
-      userId: USER_RIYA_ID,
-      chestCm: "92.5",
-      waistCm: "71.0",
-      note: "Post-workout evening measurement check",
-    },
-    {
-      id: "30000000-0000-4000-a000-000000000003",
-      userId: USER_RIYA_ID,
-      chestCm: "91.8",
-      waistCm: "69.5",
-      note: "Pre-wedding seasonal bespoke tailoring check",
-    },
-  ];
-
-  for (const h of historyEntries) {
-    await db
-      .insert(measurementHistory)
-      .values(h)
+      })
       .onConflictDoUpdate({
-        target: measurementHistory.id,
+        target: bodyProfiles.userId,
         set: {
-          chestCm: h.chestCm,
-          waistCm: h.waistCm,
-          note: h.note,
+          heightCm: "168.0",
+          weightKg: "58.0",
+          bodyType: "hourglass",
+          chestCm: "92.0",
+          waistCm: "70.0",
+          hipCm: "98.0",
+          shoulderCm: "40.0",
+          sleeveCm: "59.0",
+          inseamCm: "78.0",
+          fitPreference: "regular",
         },
       });
+
+    // 6. Seed Measurement History (Matches 5-entry log in FitloomProvider)
+    console.log("  -> Seeding measurement history log...");
+    const historyEntries = [
+      {
+        id: "30000000-0000-4000-a000-000000000001",
+        userId: USER_RIYA_ID,
+        chestCm: "92.0",
+        waistCm: "70.0",
+        note: "Initial profile calibration (Fit Intelligence setup)",
+      },
+      {
+        id: "30000000-0000-4000-a000-000000000002",
+        userId: USER_RIYA_ID,
+        chestCm: "92.5",
+        waistCm: "71.0",
+        note: "Post-workout evening measurement check",
+      },
+      {
+        id: "30000000-0000-4000-a000-000000000003",
+        userId: USER_RIYA_ID,
+        chestCm: "91.8",
+        waistCm: "69.5",
+        note: "Pre-wedding seasonal bespoke tailoring check",
+      },
+    ];
+
+    for (const h of historyEntries) {
+      await db
+        .insert(measurementHistory)
+        .values(h)
+        .onConflictDoUpdate({
+          target: measurementHistory.id,
+          set: {
+            chestCm: h.chestCm,
+            waistCm: h.waistCm,
+            note: h.note,
+          },
+        });
+    }
   }
 
   // 7. Seed Products & Garment Measurements
@@ -386,6 +416,7 @@ export async function seed() {
       .onConflictDoUpdate({
         target: products.id,
         set: {
+          sellerPartnerId: PARTNER_VERVE_ID,
           name: g.name,
           description: g.description,
           garmentType,
