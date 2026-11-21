@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { AlertTriangle, CheckCircle2, Info, Sparkles, User } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, Info, Loader2, Sparkles, User } from "lucide-react";
 import { BodyType, FitPreference, getFitPreferenceEaseCm } from "@/lib/mock-data";
 import {
   LengthFieldKey,
@@ -9,6 +9,9 @@ import {
   MeasurementUnit,
   formatLengthFromCm,
 } from "@/lib/body-profile-utils";
+import { useFitloom } from "@/components/providers/fitloom-provider";
+import { Avatar3DViewer } from "@/components/avatar/Avatar3DViewer";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +95,49 @@ export function DigitalAvatarPreview({
 
   const easeCm = getFitPreferenceEaseCm(fitPreference);
 
+  const {
+    avatarId,
+    avatarServiceOffline,
+    isGeneratingAvatar,
+    generateAvatarPreset,
+    checkAvatarStatus,
+    toast,
+  } = useFitloom();
+
+  const [viewMode, setViewMode] = useState<"3d" | "2d">("2d");
+
+  useEffect(() => {
+    checkAvatarStatus();
+  }, [checkAvatarStatus]);
+
+  useEffect(() => {
+    if (avatarId && !avatarServiceOffline) {
+      setViewMode("3d");
+    } else {
+      setViewMode("2d");
+    }
+  }, [avatarId, avatarServiceOffline]);
+
+  async function handleGenerateAvatar() {
+    const res = await generateAvatarPreset();
+    if (res.ok) {
+      setViewMode("3d");
+      toast({
+        type: "success",
+        title: "3D Avatar Calibrated",
+        message: "Your SMPL 3D mesh was generated from your body profile measurements.",
+      });
+    } else {
+      toast({
+        type: "error",
+        title: "Avatar Engine Offline",
+        message: res.error ?? "Avatar engine is temporarily offline. Using deterministic fit preview.",
+      });
+    }
+  }
+
+  const is3DActive = Boolean(avatarId) && !avatarServiceOffline && viewMode === "3d";
+
   return (
     <div className="flex flex-col rounded-3xl border border-violet-200/80 bg-gradient-to-b from-white via-[#FAF7FF] to-violet-50/70 p-5 shadow-xs sm:p-6">
       {/* Header */}
@@ -99,25 +145,112 @@ export function DigitalAvatarPreview({
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#6633EE]" aria-hidden="true" />
           <h2 className="text-sm font-bold text-slate-950">
-            Illustrative 2D Digital Avatar
+            {is3DActive
+              ? "3D Digital Avatar (SMPL)"
+              : "Illustrative 2D Digital Avatar"}
           </h2>
         </div>
-        {isEmpty ? (
-          <Badge variant="neutral" size="sm">
-            No Profile Yet
-          </Badge>
-        ) : isComplete ? (
-          <Badge variant="success" size="sm">
-            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-            {completedCount}/{totalCount} Zones Active
-          </Badge>
-        ) : (
-          <Badge variant="warning" size="sm">
-            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-            Incomplete ({completedCount}/{totalCount})
-          </Badge>
-        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          {avatarId && !avatarServiceOffline && (
+            <div className="flex items-center rounded-lg border border-violet-200 bg-white p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("3d")}
+                className={cn(
+                  "cursor-pointer rounded-md px-2 py-0.5 text-xs font-semibold transition-colors",
+                  viewMode === "3d"
+                    ? "bg-[#6633EE] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                3D Avatar
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("2d")}
+                className={cn(
+                  "cursor-pointer rounded-md px-2 py-0.5 text-xs font-semibold transition-colors",
+                  viewMode === "2d"
+                    ? "bg-[#6633EE] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                2D Zones
+              </button>
+            </div>
+          )}
+
+          {isEmpty ? (
+            <Badge variant="neutral" size="sm">
+              No Profile Yet
+            </Badge>
+          ) : isComplete ? (
+            <Badge variant="success" size="sm">
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+              {completedCount}/{totalCount} Zones Active
+            </Badge>
+          ) : (
+            <Badge variant="warning" size="sm">
+              <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+              Incomplete ({completedCount}/{totalCount})
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* Honest 503 / Offline Banner (DEC-005) */}
+      {avatarServiceOffline && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3.5 text-xs text-amber-950 shadow-2xs"
+        >
+          <div className="flex items-center gap-2 font-bold text-amber-900">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+            <span>Avatar service offline — Using deterministic fit preview</span>
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
+            The 3D avatar engine is temporarily unavailable (DEC-005: Never present
+            fallback output as a real avatar). The silhouette below is an
+            illustrative 2D proportional guide based on your entered measurements,
+            not an anatomical 3D scan.
+          </p>
+        </div>
+      )}
+
+      {/* Generate 3D Avatar Prompt when profile exists */}
+      {hasSavedProfile && !avatarId && !avatarServiceOffline && !isEditing && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50/80 p-3.5">
+          <div>
+            <p className="text-xs font-bold text-slate-900">
+              Generate 3D Avatar (SMPL Mesh)
+            </p>
+            <p className="text-[11px] text-slate-600">
+              Calibrate an interactive 3D avatar with A-Pose and T-Pose from your measurements.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleGenerateAvatar}
+            disabled={isGeneratingAvatar}
+            className="cursor-pointer"
+          >
+            {isGeneratingAvatar ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                Generating 3D Avatar...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                Generate 3D Avatar
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Empty State when no profile exists & nothing typed */}
       {isEmpty ? (
@@ -134,6 +267,8 @@ export function DigitalAvatarPreview({
               : "Create your Body Profile to unlock personalized Fit Intelligence scores, Digital Avatar zone mapping, and CUSTOMFIT sizing."}
           </p>
         </div>
+      ) : is3DActive && avatarId ? (
+        <Avatar3DViewer avatarId={avatarId} className="mt-4" />
       ) : (
         <>
           {/* 2D SVG Mannequin + Zone Guides */}

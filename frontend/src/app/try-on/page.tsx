@@ -18,7 +18,6 @@ import {
   Bookmark,
   CheckCircle2,
   Image as ImageIcon,
-  Info,
   RefreshCw,
   RotateCcw,
   ShieldAlert,
@@ -367,12 +366,11 @@ export default function VirtualTryOnPage() {
               Virtual Try-On
             </h1>
             <Badge variant="amber">
-              Visual Simulation — AI Rendering Not Connected
+              Coming Soon · AI Diffusion Pipeline In Development
             </Badge>
           </div>
           <p className="max-w-2xl text-sm text-slate-600">
-            Pair a local browser photo or 2D avatar reference with a catalogue
-            garment. Uploaded photos stay strictly on your device.
+            Preview styling combinations in the browser sandbox. Photorealistic AI try-on is scheduled for Phase 2.
           </p>
         </div>
 
@@ -388,20 +386,17 @@ export default function VirtualTryOnPage() {
         </div>
       </div>
 
-      {/* Demo Scope Disclosure */}
+      {/* Coming Soon Disclosure */}
       <aside
-        aria-label="Virtual Try-On simulation notice"
-        className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-xs text-amber-950"
+        aria-label="Virtual Try-On coming soon notice"
+        className="flex items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50/80 px-4 py-3 text-xs text-violet-950"
       >
-        <Info
-          className="mt-0.5 h-4 w-4 shrink-0 text-amber-700"
+        <Sparkles
+          className="mt-0.5 h-4 w-4 shrink-0 text-[#6633EE]"
           aria-hidden="true"
         />
         <p className="leading-relaxed">
-          <strong>Frontend Simulation Only:</strong> This workspace does not
-          perform server uploads, image compositing, or AI garment draping onto
-          your photo. For measurement-based sizing, use Fit Check or Body
-          Profile.
+          <strong>Coming Soon (Phase 2):</strong> Photorealistic AI virtual try-on diffusion pipeline is currently under active development. In the meantime, full 3D Avatar calibration (SMPL meshes in A-Pose &amp; T-Pose) is live in Body Profile and Style Studio, and this sandbox lets you preview side-by-side garment pairings locally.
         </p>
       </aside>
 

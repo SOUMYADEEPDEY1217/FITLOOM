@@ -13,12 +13,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
   Bookmark,
   Check,
   CheckCircle2,
   Info,
   Layers,
+  Loader2,
   Palette,
   RotateCcw,
   ShoppingBag,
@@ -37,6 +39,8 @@ import {
   MockSavedLook,
   useFitloom,
 } from "@/components/providers/fitloom-provider";
+import { Avatar3DViewer } from "@/components/avatar/Avatar3DViewer";
+import { DigitalAvatarPreview } from "@/components/body-profile/DigitalAvatarPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -157,6 +161,13 @@ function StudioQuerySync({
 export default function StyleStudioPage() {
   const router = useRouter();
   const {
+    bodyProfile,
+    hasBodyProfile,
+    avatarId,
+    avatarServiceOffline,
+    isGeneratingAvatar,
+    generateAvatarPreset,
+    checkAvatarStatus,
     savedLooks,
     saveLook,
     updateSavedLook,
@@ -164,6 +175,30 @@ export default function StyleStudioPage() {
     addToCart,
     toast,
   } = useFitloom();
+
+  const [stageMode, setStageMode] = useState<"canvas" | "avatar">("canvas");
+
+  useEffect(() => {
+    checkAvatarStatus();
+  }, [checkAvatarStatus]);
+
+  async function handleGenerateAvatar() {
+    const res = await generateAvatarPreset();
+    if (res.ok) {
+      toast({
+        type: "success",
+        title: "3D Avatar Calibrated",
+        message: "Your SMPL 3D mesh is ready in Style Studio.",
+      });
+    } else {
+      toast({
+        type: "error",
+        title: "Avatar Engine Offline",
+        message:
+          res.error ?? "Avatar engine offline. Showing deterministic fit fallback.",
+      });
+    }
+  }
 
   const tops = useMemo(
     () =>
@@ -1013,26 +1048,61 @@ export default function StyleStudioPage() {
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <div
                 role="group"
-                aria-label="Preview backdrop surface"
-                className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-semibold"
+                aria-label="Studio stage view"
+                className="inline-flex rounded-xl border border-violet-200 bg-violet-50/70 p-0.5 text-[11px] font-semibold"
               >
-                {BACKDROP_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    aria-pressed={backdrop === opt.id}
-                    onClick={() => setBackdrop(opt.id)}
-                    className={cn(
-                      "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
-                      backdrop === opt.id
-                        ? "bg-[#6633EE] text-white"
-                        : "text-slate-600 hover:text-slate-950"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  aria-pressed={stageMode === "canvas"}
+                  onClick={() => setStageMode("canvas")}
+                  className={cn(
+                    "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                    stageMode === "canvas"
+                      ? "bg-[#6633EE] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-950"
+                  )}
+                >
+                  Outfit Canvas
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={stageMode === "avatar"}
+                  onClick={() => setStageMode("avatar")}
+                  className={cn(
+                    "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                    stageMode === "avatar"
+                      ? "bg-[#6633EE] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-950"
+                  )}
+                >
+                  3D Avatar
+                </button>
               </div>
+
+              {stageMode === "canvas" && (
+                <div
+                  role="group"
+                  aria-label="Preview backdrop surface"
+                  className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-semibold"
+                >
+                  {BACKDROP_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      aria-pressed={backdrop === opt.id}
+                      onClick={() => setBackdrop(opt.id)}
+                      className={cn(
+                        "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                        backdrop === opt.id
+                          ? "bg-[#6633EE] text-white"
+                          : "text-slate-600 hover:text-slate-950"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <span className="text-lg font-extrabold text-[#6633EE]">
                 ₹{totalInr.toLocaleString("en-IN")}
@@ -1040,13 +1110,105 @@ export default function StyleStudioPage() {
             </div>
           </div>
 
-          {/* Canvas Preview Stage */}
-          <div
-            className={cn(
-              "rounded-2xl border p-4 transition-colors sm:p-5",
-              activeBackdrop.stageClass
-            )}
-          >
+          {stageMode === "avatar" ? (
+            <div className="space-y-4">
+              {avatarServiceOffline ? (
+                <div className="space-y-4">
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="rounded-2xl border border-amber-300 bg-amber-50/95 p-4 text-xs text-amber-950 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2 font-bold text-amber-900">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                      <span>Avatar service offline — Using deterministic fit preview</span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
+                      The 3D avatar engine is temporarily offline (DEC-005: Never present
+                      fallback output as a real avatar). The silhouette below is an
+                      illustrative 2D proportional guide based on your saved measurements,
+                      not a 3D anatomical scan.
+                    </p>
+                  </div>
+                  <DigitalAvatarPreview
+                    metricsCm={{
+                      heightCm: bodyProfile.heightCm,
+                      chestCm: bodyProfile.chestCm,
+                      waistCm: bodyProfile.waistCm,
+                      hipCm: bodyProfile.hipCm,
+                      shoulderCm: bodyProfile.shoulderCm,
+                      sleeveCm: bodyProfile.sleeveCm,
+                      inseamCm: bodyProfile.inseamCm,
+                    }}
+                    unit="cm"
+                    fitPreference={bodyProfile.fitPreference}
+                    bodyType={bodyProfile.bodyType}
+                    weightKg={
+                      bodyProfile.weightKg
+                        ? String(bodyProfile.weightKg)
+                        : undefined
+                    }
+                    hasSavedProfile={hasBodyProfile}
+                    isEditing={false}
+                    activeZone="chestCm"
+                    onSelectZone={() => {}}
+                  />
+                </div>
+              ) : avatarId ? (
+                <Avatar3DViewer avatarId={avatarId} className="h-[460px]" />
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-violet-300 bg-violet-50/50 p-8 text-center">
+                  <Sparkles className="h-8 w-8 text-[#6633EE]" />
+                  <p className="mt-3 text-base font-extrabold text-slate-900">
+                    {hasBodyProfile
+                      ? "Calibrated 3D Avatar Ready to Build"
+                      : "Body Profile Required"}
+                  </p>
+                  <p className="mt-1 max-w-sm text-xs text-slate-600">
+                    {hasBodyProfile
+                      ? "Generate an interactive 3D SMPL mesh from your calibrated measurements to preview proportions in Style Studio."
+                      : "Save your Body Profile first to enable 3D avatar generation and proportional fit calibration."}
+                  </p>
+                  <div className="mt-4 flex gap-2">
+                    {hasBodyProfile ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleGenerateAvatar}
+                        disabled={isGeneratingAvatar}
+                        className="cursor-pointer"
+                      >
+                        {isGeneratingAvatar ? (
+                          <>
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            Generating 3D Avatar...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                            Generate 3D Avatar
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <Link href="/body-profile">
+                        <Button type="button" size="sm">
+                          Go to Body Profile
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Canvas Preview Stage */
+            <div
+              className={cn(
+                "rounded-2xl border p-4 transition-colors sm:p-5",
+                activeBackdrop.stageClass
+              )}
+            >
             {selectedSlots.length === 0 ? (
               <div className="rounded-xl border border-dashed border-violet-300/80 bg-white/95 p-8 text-center">
                 <Layers
@@ -1265,6 +1427,7 @@ export default function StyleStudioPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Truthful Palette & Garment Summary */}
           {selectedGarments.length > 0 && (

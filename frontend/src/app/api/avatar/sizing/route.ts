@@ -4,6 +4,8 @@ import { db } from "@/server/db";
 import { bodyProfiles, avatars } from "@/server/db/schema";
 import { getGarmentSizing, AvatarSizingInputSchema } from "@/server/avatar";
 
+export const dynamic = "force-dynamic";
+
 export const POST = createApiHandler(
   async ({ user, body }) => {
     if (!user) {

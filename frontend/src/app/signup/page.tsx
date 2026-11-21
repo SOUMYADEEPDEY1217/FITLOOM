@@ -46,7 +46,7 @@ function SignupFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next");
-  const { loginMock, toast } = useFitloom();
+  const { signUp, loginMock, toast } = useFitloom();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -59,7 +59,7 @@ function SignupFormContent() {
     email: string;
   } | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isSubmitting) return;
 
@@ -86,19 +86,31 @@ function SignupFormContent() {
     setErrors({});
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmittedData({
-        name: parsed.data.name,
-        email: parsed.data.email,
-      });
+    const result = await signUp(
+      parsed.data.name,
+      parsed.data.email,
+      parsed.data.password
+    );
+    setIsSubmitting(false);
+
+    if (result.ok) {
       toast({
-        type: "info",
-        title: "Demo Registration Scope",
-        message:
-          "Registration fields validated. Account creation API is scheduled for Phase P3.",
+        type: "success",
+        title: "Account Created",
+        message: `Welcome, ${parsed.data.name}! Calibrating your Body Profile next.`,
       });
-    }, 300);
+      const destination = sanitizeRedirectPath(nextParam, "/body-profile");
+      router.push(destination);
+    } else {
+      if (result.fieldErrors) {
+        setErrors(result.fieldErrors as SignUpFieldErrors);
+      }
+      toast({
+        type: "error",
+        title: "Registration Failed",
+        message: result.error || "Unable to create account. Please try again.",
+      });
+    }
   }
 
   function handleDemoCustomerActivate() {
@@ -380,7 +392,7 @@ function SignupFormContent() {
           </Link>
         </p>
         <p className="mt-3 text-[11px] text-slate-400">
-          Frontend demonstration scope — real account persistence scheduled for Phase P3.
+          Account authentication and session credentials powered by FITLOOM Better Auth.
         </p>
       </div>
     </AuthSplitShowcase>

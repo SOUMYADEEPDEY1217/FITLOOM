@@ -43,7 +43,7 @@ type LoginFieldErrors = Partial<Record<"email" | "password" | "otp", string>>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loginMock, logoutMock, switchRole, toast } = useFitloom();
+  const { user, signIn, loginMock, logoutMock, switchRole, toast } = useFitloom();
 
   const [roleChoice, setRoleChoice] = useState<AuthRoleChoice>("customer");
   const [email, setEmail] = useState("riya.demo@fitloom.local");
@@ -72,7 +72,7 @@ export default function LoginPage() {
     }
   }
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (isSubmitting) return;
 
@@ -92,6 +92,34 @@ export default function LoginPage() {
 
     setErrors({});
     setIsSubmitting(true);
+
+    const isKnownDemo = Object.values(ROLE_DEMO_EMAILS).includes(
+      email.trim().toLowerCase()
+    );
+    if (!isKnownDemo) {
+      const result = await signIn(email, password);
+      setIsSubmitting(false);
+      if (result.ok) {
+        toast({
+          type: "success",
+          title: "Signed In",
+          message: "Welcome back to FITLOOM.",
+        });
+        const nextParam =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("next")
+            : null;
+        router.push(sanitizeRedirectPath(nextParam, "/shop"));
+      } else {
+        if (result.fieldErrors) setErrors(result.fieldErrors);
+        toast({
+          type: "error",
+          title: "Sign-In Failed",
+          message: result.error || "Invalid credentials. Please try again.",
+        });
+      }
+      return;
+    }
 
     timerRef.current = setTimeout(() => {
       setIsSubmitting(false);

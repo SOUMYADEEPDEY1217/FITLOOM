@@ -85,6 +85,7 @@ const UPPER_BODY_CATEGORIES: ReadonlySet<MockGarment["category"]> = new Set([
   "Outerwear",
   "T-Shirts",
   "Hoodies",
+  "Kurtis",
 ]);
 
 function round1(value: number): number {

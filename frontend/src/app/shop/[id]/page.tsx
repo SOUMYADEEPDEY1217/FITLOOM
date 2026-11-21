@@ -733,7 +733,7 @@ export default function ProductDetailPage({
                       Virtual Try-On &amp; Studio
                     </span>
                     <Badge variant="amber" size="sm">
-                      Visual Simulation
+                      Coming Soon
                     </Badge>
                   </div>
                   <p className="text-xs leading-relaxed text-slate-600">
@@ -745,7 +745,7 @@ export default function ProductDetailPage({
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link href={`/try-on?product=${encodeURIComponent(garment.id)}`}>
                     <Button size="sm" variant="secondary">
-                      Open Try-On
+                      Open Try-On (Coming Soon)
                       <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </Link>
