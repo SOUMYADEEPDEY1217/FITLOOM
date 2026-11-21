@@ -141,8 +141,8 @@ export function createApiHandler<TBody = unknown, TResult = unknown>(
         const refererHeader = req.headers.get("referer");
         const originToCheck = originHeader || (refererHeader ? new URL(refererHeader).origin : null);
 
-        // If origin header is present, verify it matches allowed origins or host origin
-        if (originToCheck && !isAllowedOrigin(originToCheck, reqOrigin)) {
+        // Verify origin matches allowed origins or host origin
+        if (!originToCheck || !isAllowedOrigin(originToCheck, reqOrigin)) {
           throw new ApiError(403, "FORBIDDEN", "Cross-origin request forbidden");
         }
       }

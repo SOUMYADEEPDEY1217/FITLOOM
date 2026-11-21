@@ -31,6 +31,10 @@ export const auth = betterAuth({
     },
   },
   advanced: {
+    generateId: () => crypto.randomUUID(),
+    database: {
+      generateId: "uuid",
+    },
     cookiePrefix: "fitloom",
     useSecureCookies: process.env.NODE_ENV === "production",
   },

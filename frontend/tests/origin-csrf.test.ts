@@ -45,6 +45,21 @@ describe("CSRF / Same-Origin Verification", () => {
     });
   });
 
+  it("blocks mutating requests with missing Origin/Referer header with HTTP 403", async () => {
+    const req = new NextRequest("http://localhost:3000/api/mutate", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ item: "exploit" }),
+    });
+
+    const res = await mutatingHandler(req);
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error.code).toBe("FORBIDDEN");
+  });
+
   it("allows GET requests regardless of external origin", async () => {
     const getHandler = createApiHandler(async () => ({ data: "safe" }));
 
