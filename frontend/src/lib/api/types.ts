@@ -199,6 +199,29 @@ export interface ProductResponse {
 }
 
 // ==========================================
+// Avatar Dress API Types
+// ==========================================
+
+export interface AvatarDressInput {
+  avatarId: string;
+  garmentType: "tshirt" | "shirt" | "trousers" | "kurti";
+  size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  fitPreference?: "slim" | "regular" | "relaxed" | "oversized";
+}
+
+export interface AvatarDressGarment {
+  type: string;
+  size: string;
+  fitPreference?: string;
+  url: string;
+}
+
+export interface AvatarDressResponse {
+  mode: "live_ai" | "fallback_demo";
+  garment: AvatarDressGarment;
+}
+
+// ==========================================
 // Fit-Check API Types
 // ==========================================
 

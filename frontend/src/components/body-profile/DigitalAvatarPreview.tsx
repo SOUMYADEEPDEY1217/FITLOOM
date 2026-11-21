@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, Loader2, Sparkles, User } from "lucide-react";
-import { BodyType, FitPreference, getFitPreferenceEaseCm } from "@/lib/mock-data";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { AlertTriangle, CheckCircle2, Info, Loader2, Sparkles, Trash2, User } from "lucide-react";
+import { BodyType, FitPreference, GarmentType, getFitPreferenceEaseCm } from "@/lib/mock-data";
 import {
   LengthFieldKey,
   MEASUREMENT_FIELDS,
@@ -14,6 +14,45 @@ import { Avatar3DViewer } from "@/components/avatar/Avatar3DViewer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { api, ApiError } from "@/lib/api";
+import {
+  ProductsQuery,
+  ProductItem,
+  AvatarDressInput,
+  AvatarDressResponse,
+} from "@/lib/api/types";
+
+// Local constants (duplicated from studio page to avoid circular imports)
+const GARMENT_TYPE_OPTIONS: ReadonlyArray<{
+  value: GarmentType;
+  label: string;
+  category: string;
+}> = [
+  { value: "tshirt", label: "T-Shirt", category: "T-Shirts" },
+  { value: "shirt", label: "Shirt", category: "Shirts" },
+  { value: "trousers", label: "Trousers", category: "Trousers" },
+  { value: "kurti", label: "Kurti", category: "Kurtis" },
+];
+
+const SIZE_OPTIONS: ReadonlyArray<"XS" | "S" | "M" | "L" | "XL" | "XXL"> = [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+];
+
+const FIT_PREFERENCE_OPTIONS: ReadonlyArray<{
+  value: "slim" | "regular" | "relaxed" | "oversized";
+  label: string;
+  easeCm: number;
+}> = [
+  { value: "slim", label: "Slim", easeCm: 5 },
+  { value: "regular", label: "Regular", easeCm: 8 },
+  { value: "relaxed", label: "Relaxed", easeCm: 12 },
+  { value: "oversized", label: "Oversized", easeCm: 15 },
+];
 
 interface DigitalAvatarPreviewProps {
   metricsCm: Partial<Record<LengthFieldKey, number>>;
@@ -105,6 +144,170 @@ export function DigitalAvatarPreview({
   } = useFitloom();
 
   const [viewMode, setViewMode] = useState<"3d" | "2d">("2d");
+
+  // Garment Panel State
+  const [garmentPanelGarmentType, setGarmentPanelGarmentType] = useState<GarmentType>("shirt");
+  const [garmentPanelCatalogue, setGarmentPanelCatalogue] = useState<ProductItem[]>([]);
+  const [garmentPanelSelectedProductId, setGarmentPanelSelectedProductId] = useState<string | null>(null);
+  const [garmentPanelSelectedSize, setGarmentPanelSelectedSize] = useState<"XS" | "S" | "M" | "L" | "XL" | "XXL">("M");
+  const [garmentPanelFitPreference, setGarmentPanelFitPreference] = useState<"slim" | "regular" | "relaxed" | "oversized">("regular");
+  const [garmentPanelRecommendedSize, setGarmentPanelRecommendedSize] = useState<"XS" | "S" | "M" | "L" | "XL" | "XXL" | null>(null);
+  const [garmentPanelLoading, setGarmentPanelLoading] = useState(false);
+  const [garmentPanelError, setGarmentPanelError] = useState<string | null>(null);
+  const [garmentPanelDressedUrl, setGarmentPanelDressedUrl] = useState<string | null>(null);
+  const [garmentPanelCatalogueLoading, setGarmentPanelCatalogueLoading] = useState(false);
+
+  const selectedGarmentPanelProduct = useMemo(
+    () => garmentPanelCatalogue.find((g) => g.id === garmentPanelSelectedProductId) ?? null,
+    [garmentPanelCatalogue, garmentPanelSelectedProductId]
+  );
+
+  // Garment Panel: Fetch catalogue when garment type changes
+  useEffect(() => {
+    let cancelled = false;
+    setGarmentPanelCatalogueLoading(true);
+    setGarmentPanelCatalogue([]);
+    setGarmentPanelSelectedProductId(null);
+
+    const query: ProductsQuery = {
+      garmentType: garmentPanelGarmentType,
+      limit: 50,
+    };
+
+    api.getProducts(query)
+      .then((res) => {
+        if (!cancelled) {
+          setGarmentPanelCatalogue(res.products);
+          if (res.products.length > 0) {
+            setGarmentPanelSelectedProductId(res.products[0].id);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGarmentPanelCatalogue([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGarmentPanelCatalogueLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [garmentPanelGarmentType]);
+
+  // Garment Panel: Fetch fit check recommendation when product/size/preference changes
+  useEffect(() => {
+    if (!garmentPanelSelectedProductId) {
+      setGarmentPanelRecommendedSize(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    api.fitCheck({
+      productId: garmentPanelSelectedProductId,
+      fitPreference: garmentPanelFitPreference,
+    })
+      .then((res) => {
+        if (!cancelled && res.recommendedSize) {
+          // Map S/M/L/XL to XS/S/M/L/XL/XXL
+          const sizeMap: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL"> = {
+            S: "S",
+            M: "M",
+            L: "L",
+            XL: "XL",
+          };
+          setGarmentPanelRecommendedSize(sizeMap[res.recommendedSize] ?? "M");
+        } else if (!cancelled) {
+          setGarmentPanelRecommendedSize("M");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGarmentPanelRecommendedSize("M");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [garmentPanelSelectedProductId, garmentPanelFitPreference]);
+
+  // Garment Panel: Dress avatar
+  const handleDressAvatar = useCallback(async () => {
+    if (!avatarId) {
+      toast({
+        type: "warning",
+        title: "Create Your Avatar First",
+        message: "Generate a 3D avatar from your Body Profile before dressing it.",
+      });
+      return;
+    }
+    if (avatarServiceOffline) {
+      toast({
+        type: "error",
+        title: "Avatar Service Offline",
+        message: "The 3D avatar engine is temporarily unavailable. Please try again later.",
+      });
+      return;
+    }
+    if (!garmentPanelSelectedProductId) {
+      toast({
+        type: "warning",
+        title: "Select a Garment",
+        message: "Choose a garment from the catalogue before dressing your avatar.",
+      });
+      return;
+    }
+
+    setGarmentPanelLoading(true);
+    setGarmentPanelError(null);
+
+    const input: AvatarDressInput = {
+      avatarId,
+      garmentType: garmentPanelGarmentType,
+      size: garmentPanelSelectedSize,
+      fitPreference: garmentPanelFitPreference,
+    };
+
+    try {
+      const res: AvatarDressResponse = await api.dressAvatar(input);
+      setGarmentPanelDressedUrl(res.garment.url);
+      toast({
+        type: "success",
+        title: "Avatar Dressed",
+        message: `Garment applied in ${res.mode === "live_ai" ? "live AI" : "fallback demo"} mode.`,
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          setGarmentPanelError("Please sign in to use the avatar dressing feature.");
+        } else if (err.status === 404) {
+          setGarmentPanelError("Avatar not found. Please regenerate your avatar.");
+        } else if (err.status === 422) {
+          setGarmentPanelError(err.message || "Invalid garment selection.");
+        } else if (err.status === 503) {
+          setGarmentPanelError("Avatar engine temporarily unavailable. Please try again later.");
+        } else {
+          setGarmentPanelError(err.message || "Failed to dress avatar.");
+        }
+      } else {
+        setGarmentPanelError("An unexpected error occurred.");
+      }
+    } finally {
+      setGarmentPanelLoading(false);
+    }
+  }, [avatarId, avatarServiceOffline, garmentPanelGarmentType, garmentPanelSelectedProductId, garmentPanelSelectedSize, garmentPanelFitPreference, toast]);
+
+  // Garment Panel: Remove garment
+  const handleRemoveGarment = useCallback(() => {
+    setGarmentPanelDressedUrl(null);
+    toast({
+      type: "info",
+      title: "Garment Removed",
+      message: "The garment has been removed from your avatar.",
+    });
+  }, [toast]);
 
   useEffect(() => {
     checkAvatarStatus();
@@ -268,7 +471,231 @@ export function DigitalAvatarPreview({
           </p>
         </div>
       ) : is3DActive && avatarId ? (
-        <Avatar3DViewer avatarId={avatarId} className="mt-4" />
+        <>
+          <Avatar3DViewer avatarId={avatarId} garmentUrl={garmentPanelDressedUrl} className="mt-4" />
+          {/* Garment Panel */}
+          <section
+            aria-labelledby="garment-panel-heading"
+            className="mt-4 space-y-4 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-2xs"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h3
+                id="garment-panel-heading"
+                className="flex items-center gap-2 text-sm font-extrabold text-slate-950"
+              >
+                <Sparkles className="h-4 w-4 text-[#6633EE]" aria-hidden="true" />
+                Dress Your Avatar
+              </h3>
+              <Badge variant="neutral" size="sm">
+                Beta
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-600">
+              Select a garment from the live catalogue, pick your size and fit
+              preference, and see it on your 3D avatar.
+            </p>
+
+            {/* Garment Type Selector */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="garment-panel-type-bp"
+                className="block text-xs font-bold text-slate-800"
+              >
+                Garment Type
+              </label>
+              <select
+                id="garment-panel-type-bp"
+                value={garmentPanelGarmentType}
+                onChange={(e) =>
+                  setGarmentPanelGarmentType(e.target.value as GarmentType)
+                }
+                className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                disabled={garmentPanelCatalogueLoading}
+              >
+                {GARMENT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Catalogue Garment Picker */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="garment-panel-catalogue-bp"
+                className="block text-xs font-bold text-slate-800"
+              >
+                Catalogue Garment
+              </label>
+              {garmentPanelCatalogueLoading ? (
+                <div className="min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#6633EE]" />
+                  <span className="ml-2 text-xs text-slate-500">Loading catalogue...</span>
+                </div>
+              ) : garmentPanelCatalogue.length === 0 ? (
+                <div className="min-h-10 w-full rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-xs text-slate-500">
+                  No garments available for this type.
+                </div>
+              ) : (
+                <select
+                  id="garment-panel-catalogue-bp"
+                  value={garmentPanelSelectedProductId ?? ""}
+                  onChange={(e) =>
+                    setGarmentPanelSelectedProductId(e.target.value || null)
+                  }
+                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                >
+                  <option value="">Select a garment...</option>
+                  {garmentPanelCatalogue.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
+                    </option>
+                  ))}
+                </select>
+              )}
+              {selectedGarmentPanelProduct ? (
+                <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <span
+                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
+                    style={{ backgroundColor: selectedGarmentPanelProduct.swatchHex }}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">
+                    {selectedGarmentPanelProduct.fitType} Fit · {selectedGarmentPanelProduct.fabric}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-500">No garment selected.</p>
+              )}
+            </div>
+
+            {/* Size Buttons */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                Size
+              </label>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Garment size">
+                {SIZE_OPTIONS.map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    role="radio"
+                    aria-checked={garmentPanelSelectedSize === sz}
+                    onClick={() => setGarmentPanelSelectedSize(sz)}
+                    className={cn(
+                      "cursor-pointer min-h-10 min-w-[44px] rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                      garmentPanelSelectedSize === sz
+                        ? "bg-[#6633EE] border-[#6633EE] text-white"
+                        : garmentPanelRecommendedSize === sz
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                        : "border-slate-300 bg-white text-slate-900 hover:border-violet-400 hover:bg-violet-50"
+                    )}
+                  >
+                    {sz}
+                    {garmentPanelRecommendedSize === sz && garmentPanelSelectedSize !== sz && (
+                      <span className="ml-1 text-[10px] font-normal">Best</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {garmentPanelRecommendedSize && (
+                <p className="text-[11px] text-emerald-700">
+                  <span className="font-semibold">Best fit:</span>{" "}
+                  {garmentPanelRecommendedSize} (from Fit Check for your
+                  {garmentPanelFitPreference} preference)
+                </p>
+              )}
+            </div>
+
+            {/* Fit Preference Selector */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                Fit Preference
+              </label>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Fit preference">
+                {FIT_PREFERENCE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={garmentPanelFitPreference === opt.value}
+                    onClick={() => setGarmentPanelFitPreference(opt.value)}
+                    className={cn(
+                      "cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                      garmentPanelFitPreference === opt.value
+                        ? "bg-[#6633EE] border-[#6633EE] text-white"
+                        : "border-slate-300 bg-white text-slate-900 hover:border-violet-400 hover:bg-violet-50"
+                    )}
+                  >
+                    {opt.label} (+{opt.easeCm} cm)
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleDressAvatar}
+                disabled={garmentPanelLoading || !avatarId || avatarServiceOffline || !garmentPanelSelectedProductId}
+                className="flex-1 min-w-[140px]"
+              >
+                {garmentPanelLoading ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Dressing Avatar...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    Dress Avatar
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleRemoveGarment}
+                disabled={!garmentPanelDressedUrl}
+                className="flex-1 min-w-[140px]"
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Remove Garment
+              </Button>
+            </div>
+
+            {/* Error / Status Messages */}
+            {garmentPanelError && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{garmentPanelError}</span>
+              </div>
+            )}
+            {!avatarId && !garmentPanelError && !garmentPanelLoading && (
+              <div
+                className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span>Create your avatar first to use the dressing feature.</span>
+              </div>
+            )}
+            {avatarServiceOffline && !garmentPanelError && !garmentPanelLoading && (
+              <div
+                className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span>Avatar service offline — dressing unavailable.</span>
+              </div>
+            )}
+          </section>
+        </>
       ) : (
         <>
           {/* 2D SVG Mannequin + Zone Guides */}

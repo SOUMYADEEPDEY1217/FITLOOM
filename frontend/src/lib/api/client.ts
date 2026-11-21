@@ -6,6 +6,8 @@ import {
   ProductResponse,
   FitCheckInput,
   FitCheckResponse,
+  AvatarDressInput,
+  AvatarDressResponse,
 } from "./types";
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
@@ -124,6 +126,12 @@ export async function fitCheck(
   return api.post<FitCheckResponse>("/api/fit-check", body);
 }
 
+export async function dressAvatar(
+  body: AvatarDressInput
+): Promise<AvatarDressResponse> {
+  return api.post<AvatarDressResponse>("/api/avatar/dress", body);
+}
+
 export const api = {
   get: <T>(url: string, options?: RequestOptions) =>
     request<T>(url, "GET", undefined, options),
@@ -138,6 +146,7 @@ export const api = {
   getProducts,
   getProduct,
   fitCheck,
+  dressAvatar,
 };
 
 export default api;

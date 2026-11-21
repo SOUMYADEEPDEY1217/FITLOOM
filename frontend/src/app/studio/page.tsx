@@ -29,7 +29,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { MOCK_GARMENTS, MockGarment } from "@/lib/mock-data";
+import { MOCK_GARMENTS, MockGarment, GarmentType } from "@/lib/mock-data";
 import { GarmentSize } from "@/lib/shop-utils";
 import {
   resolveExplicitGarmentSize,
@@ -45,6 +45,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { api, ApiError } from "@/lib/api";
+import {
+  AvatarDressInput,
+  AvatarDressResponse,
+  ProductsQuery,
+  ProductItem,
+} from "@/lib/api/types";
 
 type StudioBackdrop = "violet" | "light" | "slate";
 
@@ -158,6 +165,37 @@ function StudioQuerySync({
   return null;
 }
 
+const GARMENT_TYPE_OPTIONS: ReadonlyArray<{
+  value: GarmentType;
+  label: string;
+  category: string;
+}> = [
+  { value: "tshirt", label: "T-Shirt", category: "T-Shirts" },
+  { value: "shirt", label: "Shirt", category: "Shirts" },
+  { value: "trousers", label: "Trousers", category: "Trousers" },
+  { value: "kurti", label: "Kurti", category: "Kurtis" },
+];
+
+const SIZE_OPTIONS: ReadonlyArray<"XS" | "S" | "M" | "L" | "XL" | "XXL"> = [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+];
+
+const FIT_PREFERENCE_OPTIONS: ReadonlyArray<{
+  value: "slim" | "regular" | "relaxed" | "oversized";
+  label: string;
+  easeCm: number;
+}> = [
+  { value: "slim", label: "Slim", easeCm: 5 },
+  { value: "regular", label: "Regular", easeCm: 8 },
+  { value: "relaxed", label: "Relaxed", easeCm: 12 },
+  { value: "oversized", label: "Oversized", easeCm: 15 },
+];
+
 export default function StyleStudioPage() {
   const router = useRouter();
   const {
@@ -245,6 +283,18 @@ export default function StyleStudioPage() {
   const [savedTitleBanner, setSavedTitleBanner] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState<boolean>(false);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+
+  // Garment Panel State
+  const [garmentPanelGarmentType, setGarmentPanelGarmentType] = useState<GarmentType>("shirt");
+  const [garmentPanelCatalogue, setGarmentPanelCatalogue] = useState<ProductItem[]>([]);
+  const [garmentPanelSelectedProductId, setGarmentPanelSelectedProductId] = useState<string | null>(null);
+  const [garmentPanelSelectedSize, setGarmentPanelSelectedSize] = useState<"XS" | "S" | "M" | "L" | "XL" | "XXL">("M");
+  const [garmentPanelFitPreference, setGarmentPanelFitPreference] = useState<"slim" | "regular" | "relaxed" | "oversized">("regular");
+  const [garmentPanelRecommendedSize, setGarmentPanelRecommendedSize] = useState<"XS" | "S" | "M" | "L" | "XL" | "XXL" | null>(null);
+  const [garmentPanelLoading, setGarmentPanelLoading] = useState(false);
+  const [garmentPanelError, setGarmentPanelError] = useState<string | null>(null);
+  const [garmentPanelDressedUrl, setGarmentPanelDressedUrl] = useState<string | null>(null);
+  const [garmentPanelCatalogueLoading, setGarmentPanelCatalogueLoading] = useState(false);
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const addTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -386,6 +436,153 @@ export default function StyleStudioPage() {
       text: `Pre-selected ${garment.name} in your outfit composer.`,
     });
   }, []);
+
+  // Garment Panel: Fetch catalogue when garment type changes
+  useEffect(() => {
+    let cancelled = false;
+    setGarmentPanelCatalogueLoading(true);
+    setGarmentPanelCatalogue([]);
+    setGarmentPanelSelectedProductId(null);
+
+    const query: ProductsQuery = {
+      garmentType: garmentPanelGarmentType,
+      limit: 50,
+    };
+
+    api.getProducts(query)
+      .then((res) => {
+        if (!cancelled) {
+          setGarmentPanelCatalogue(res.products);
+          if (res.products.length > 0) {
+            setGarmentPanelSelectedProductId(res.products[0].id);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGarmentPanelCatalogue([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGarmentPanelCatalogueLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [garmentPanelGarmentType]);
+
+  // Garment Panel: Fetch fit check recommendation when product/size/preference changes
+  useEffect(() => {
+    if (!garmentPanelSelectedProductId) {
+      setGarmentPanelRecommendedSize(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    api.fitCheck({
+      productId: garmentPanelSelectedProductId,
+      fitPreference: garmentPanelFitPreference,
+    })
+      .then((res) => {
+        if (!cancelled && res.recommendedSize) {
+          // Map S/M/L/XL to XS/S/M/L/XL/XXL
+          const sizeMap: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL"> = {
+            S: "S",
+            M: "M",
+            L: "L",
+            XL: "XL",
+          };
+          setGarmentPanelRecommendedSize(sizeMap[res.recommendedSize] ?? "M");
+        } else if (!cancelled) {
+          setGarmentPanelRecommendedSize("M");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGarmentPanelRecommendedSize("M");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [garmentPanelSelectedProductId, garmentPanelFitPreference]);
+
+  // Garment Panel: Dress avatar
+  const handleDressAvatar = useCallback(async () => {
+    if (!avatarId) {
+      toast({
+        type: "warning",
+        title: "Create Your Avatar First",
+        message: "Generate a 3D avatar from your Body Profile before dressing it.",
+      });
+      return;
+    }
+    if (avatarServiceOffline) {
+      toast({
+        type: "error",
+        title: "Avatar Service Offline",
+        message: "The 3D avatar engine is temporarily unavailable. Please try again later.",
+      });
+      return;
+    }
+    if (!garmentPanelSelectedProductId) {
+      toast({
+        type: "warning",
+        title: "Select a Garment",
+        message: "Choose a garment from the catalogue before dressing your avatar.",
+      });
+      return;
+    }
+
+    setGarmentPanelLoading(true);
+    setGarmentPanelError(null);
+
+    const input: AvatarDressInput = {
+      avatarId,
+      garmentType: garmentPanelGarmentType,
+      size: garmentPanelSelectedSize,
+      fitPreference: garmentPanelFitPreference,
+    };
+
+    try {
+      const res: AvatarDressResponse = await api.dressAvatar(input);
+      setGarmentPanelDressedUrl(res.garment.url);
+      toast({
+        type: "success",
+        title: "Avatar Dressed",
+        message: `Garment applied in ${res.mode === "live_ai" ? "live AI" : "fallback demo"} mode.`,
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          setGarmentPanelError("Please sign in to use the avatar dressing feature.");
+        } else if (err.status === 404) {
+          setGarmentPanelError("Avatar not found. Please regenerate your avatar.");
+        } else if (err.status === 422) {
+          setGarmentPanelError(err.message || "Invalid garment selection.");
+        } else if (err.status === 503) {
+          setGarmentPanelError("Avatar engine temporarily unavailable. Please try again later.");
+        } else {
+          setGarmentPanelError(err.message || "Failed to dress avatar.");
+        }
+      } else {
+        setGarmentPanelError("An unexpected error occurred.");
+      }
+    } finally {
+      setGarmentPanelLoading(false);
+    }
+  }, [avatarId, avatarServiceOffline, garmentPanelGarmentType, garmentPanelSelectedProductId, garmentPanelSelectedSize, garmentPanelFitPreference, toast]);
+
+  // Garment Panel: Remove garment
+  const handleRemoveGarment = useCallback(() => {
+    setGarmentPanelDressedUrl(null);
+    toast({
+      type: "info",
+      title: "Garment Removed",
+      message: "The garment has been removed from your avatar.",
+    });
+  }, [toast]);
 
   function validateLookTitle(value: string): string | null {
     if (!value.trim()) {
@@ -629,6 +826,14 @@ export default function StyleStudioPage() {
       ? "Add All 3 to Cart"
       : `Add All ${selectedGarments.length} to Cart`;
 
+  const selectedGarmentPanelProduct = useMemo(
+    () =>
+      garmentPanelCatalogue.find(
+        (g) => g.id === garmentPanelSelectedProductId
+      ) ?? null,
+    [garmentPanelCatalogue, garmentPanelSelectedProductId]
+  );
+
   return (
     <div className="space-y-8 pb-10">
       <Suspense fallback={null}>
@@ -676,1036 +881,1270 @@ export default function StyleStudioPage() {
         </div>
       ) : (
         <>
-
-      {/* Header */}
-      <div className="flex flex-col justify-between gap-4 border-b border-violet-100 pb-6 sm:flex-row sm:items-end">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-950 break-words">
-              Style Studio
-            </h1>
-            <Badge variant="amber">Session Composer</Badge>
-          </div>
-          <p className="max-w-2xl text-sm text-slate-600">
-            Pair tops, trousers, and outerwear from the collection, pick exact
-            bag sizes, and save outfits to your session lookbook.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <Link href="/shop">
-            <Button type="button" variant="ghost" size="sm">
-              Browse Catalogue
-            </Button>
-          </Link>
-          <Link href="/saved-looks">
-            <Button type="button" variant="outline" size="sm">
-              <Bookmark className="h-3.5 w-3.5" aria-hidden="true" />
-              View Saved Looks ({savedLooks.length})
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Honest Frontend / Mock Scope Disclosure */}
-      <aside
-        aria-label="Style Studio demo disclosure"
-        className="flex items-start gap-3 rounded-2xl border border-violet-200/80 bg-violet-50/50 px-4 py-3 text-xs text-slate-700"
-      >
-        <Info
-          className="mt-0.5 h-4 w-4 shrink-0 text-[#6633EE]"
-          aria-hidden="true"
-        />
-        <p className="leading-relaxed">
-          <strong>Frontend Demo Notice:</strong> Style Studio uses the local{" "}
-          {MOCK_GARMENTS.length}-piece mock catalogue for manual outfit pairing
-          and does not generate AI styling scores or persist looks to a
-          database. Saved looks remain in your active browser session.
-        </p>
-      </aside>
-
-      {/* Query Hydration / Preset Status Notice */}
-      {queryNotice && (
-        <div
-          role="status"
-          className={cn(
-            "flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-xs font-medium",
-            queryNotice.type === "warning"
-              ? "border-amber-200 bg-amber-50 text-amber-900"
-              : "border-violet-200 bg-white text-slate-800"
-          )}
-        >
-          <span className="min-w-0 break-words">{queryNotice.text}</span>
-          <button
-            type="button"
-            onClick={() => setQueryNotice(null)}
-            aria-label="Dismiss notice"
-            className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]"
-          >
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </div>
-      )}
-
-      {/* Main Composer Workspace */}
-      <div className="grid items-start gap-8 lg:grid-cols-12">
-        {/* Left: Garment Selection & Look Form */}
-        <section
-          aria-labelledby="composer-controls-heading"
-          className="min-w-0 space-y-5 rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-2xs sm:p-6 lg:col-span-5"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
-            <div>
-              <h2
-                id="composer-controls-heading"
-                className="flex items-center gap-2 text-base font-extrabold text-slate-950"
-              >
-                <Layers className="h-4 w-4 text-[#6633EE]" aria-hidden="true" />
-                Outfit Layer Controls
-              </h2>
-              <p className="mt-0.5 text-xs text-slate-600">
-                Choose up to 3 layers or skip any slot.
-              </p>
+        {/* Header */}
+        <div className="flex flex-col justify-between gap-4 border-b border-violet-100 pb-6 sm:flex-row sm:items-end">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-950 break-words">
+                Style Studio
+              </h1>
+              <Badge variant="amber">Session Composer</Badge>
             </div>
+            <p className="max-w-2xl text-sm text-slate-600">
+              Pair tops, trousers, and outerwear from the collection, pick exact
+              bag sizes, and save outfits to your session lookbook.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <Link href="/shop">
+              <Button type="button" variant="ghost" size="sm">
+                Browse Catalogue
+              </Button>
+            </Link>
+            <Link href="/saved-looks">
+              <Button type="button" variant="outline" size="sm">
+                <Bookmark className="h-3.5 w-3.5" aria-hidden="true" />
+                View Saved Looks ({savedLooks.length})
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Honest Frontend / Mock Scope Disclosure */}
+        <aside
+          aria-label="Style Studio demo disclosure"
+          className="flex items-start gap-3 rounded-2xl border border-violet-200/80 bg-violet-50/50 px-4 py-3 text-xs text-slate-700"
+        >
+          <Info
+            className="mt-0.5 h-4 w-4 shrink-0 text-[#6633EE]"
+            aria-hidden="true"
+          />
+          <p className="leading-relaxed">
+            <strong>Frontend Demo Notice:</strong> Style Studio uses the local{" "}
+            {MOCK_GARMENTS.length}-piece mock catalogue for manual outfit pairing
+            and does not generate AI styling scores or persist looks to a
+            database. Saved looks remain in your active browser session.
+          </p>
+        </aside>
+
+        {/* Query Hydration / Preset Status Notice */}
+        {queryNotice && (
+          <div
+            role="status"
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-xs font-medium",
+              queryNotice.type === "warning"
+                ? "border-amber-200 bg-amber-50 text-amber-900"
+                : "border-violet-200 bg-white text-slate-800"
+            )}
+          >
+            <span className="min-w-0 break-words">{queryNotice.text}</span>
             <button
               type="button"
-              onClick={handleClearCanvas}
-              disabled={selectedGarments.length === 0}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]"
+              onClick={() => setQueryNotice(null)}
+              aria-label="Dismiss notice"
+              className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]"
             >
-              <RotateCcw className="h-3 w-3" aria-hidden="true" />
-              Clear All
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </div>
+        )}
 
-          {/* Manual Presets (Non-AI) */}
-          <div className="space-y-2">
-            <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Quick Catalogue Pairings (Manual)
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  applyManualPreset(
-                    "Editorial Studio Look",
-                    defaultSlots,
-                    "Loaded 3-layer pairing from the mock catalogue."
-                  )
-                }
-              >
-                Full 3-Layer
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  applyManualPreset(
-                    "Formal Work Pairing",
-                    {
-                      topId: "classic-navy-shirt",
-                      bottomId: "architectural-pleated-trouser",
-                      outerId: "",
-                    },
-                    "Loaded 2-piece Formal / Work pairing."
-                  )
-                }
-              >
-                Work Smart
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  applyManualPreset(
-                    "Relaxed Travel Look",
-                    {
-                      topId: "olive-linen-shirt",
-                      bottomId: "architectural-pleated-trouser",
-                      outerId: "",
-                    },
-                    "Loaded 2-piece Casual / Travel pairing."
-                  )
-                }
-              >
-                Casual Travel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={handleCycleTop}
-              >
-                <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
-                Swap Top
-              </Button>
-            </div>
-          </div>
-
-          {/* Layer Selectors */}
-          <div className="space-y-4">
-            {/* Top Layer */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="studio-top-select"
-                className="block text-xs font-bold text-slate-800"
-              >
-                Top Layer (Shirts &amp; Tees)
-              </label>
-              <select
-                id="studio-top-select"
-                value={topId}
-                onChange={(e) => handleLayerChange("top", e.target.value)}
-                className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
-              >
-                <option value="">None (Skip top layer)</option>
-                {tops.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
-                  </option>
-                ))}
-              </select>
-              {topGarment ? (
-                <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
-                  <span
-                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
-                    style={{ backgroundColor: topGarment.swatchHex }}
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">
-                    {topGarment.fitType} Fit · {topGarment.fabric}
-                  </span>
-                </p>
-              ) : (
-                <p className="text-[11px] text-slate-500">
-                  No top layer selected.
-                </p>
-              )}
-            </div>
-
-            {/* Bottom Layer */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="studio-bottom-select"
-                className="block text-xs font-bold text-slate-800"
-              >
-                Bottom Layer (Trousers)
-              </label>
-              <select
-                id="studio-bottom-select"
-                value={bottomId}
-                onChange={(e) => handleLayerChange("bottom", e.target.value)}
-                className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
-              >
-                <option value="">None (Skip bottom layer)</option>
-                {bottoms.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
-                  </option>
-                ))}
-              </select>
-              {bottomGarment ? (
-                <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
-                  <span
-                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
-                    style={{ backgroundColor: bottomGarment.swatchHex }}
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">
-                    {bottomGarment.fitType} Fit · {bottomGarment.fabric}
-                  </span>
-                </p>
-              ) : (
-                <p className="text-[11px] text-slate-500">
-                  No bottom layer selected.
-                </p>
-              )}
-            </div>
-
-            {/* Outerwear Layer */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="studio-outer-select"
-                className="block text-xs font-bold text-slate-800"
-              >
-                Outerwear Layer
-              </label>
-              <select
-                id="studio-outer-select"
-                value={outerId}
-                onChange={(e) => handleLayerChange("outer", e.target.value)}
-                className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
-              >
-                <option value="">None (Skip outerwear layer)</option>
-                {outer.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
-                  </option>
-                ))}
-              </select>
-              {outerGarment ? (
-                <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
-                  <span
-                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
-                    style={{ backgroundColor: outerGarment.swatchHex }}
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">
-                    {outerGarment.fitType} Fit · {outerGarment.fabric}
-                  </span>
-                </p>
-              ) : (
-                <p className="text-[11px] text-slate-500">
-                  No outerwear layer selected.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Look Name Form */}
-          <form
-            id="studio-save-form"
-            onSubmit={handleSaveLook}
-            noValidate
-            className="space-y-2 border-t border-slate-100 pt-4"
+        {/* Main Composer Workspace */}
+        <div className="grid items-start gap-8 lg:grid-cols-12">
+          {/* Left: Garment Selection & Look Form + Garment Panel */}
+          <section
+            aria-labelledby="composer-controls-heading"
+            className="min-w-0 space-y-5 rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-2xs sm:p-6 lg:col-span-5"
           >
-            <label
-              htmlFor="studio-look-title"
-              className="block text-xs font-bold text-slate-800"
-            >
-              Look Name <span className="text-red-600" aria-hidden="true">*</span>
-            </label>
-            <p
-              id="studio-look-title-help"
-              className="text-[11px] text-slate-500"
-            >
-              Name this pairing (1–60 characters) before saving to your session
-              lookbook.
-            </p>
-            <Input
-              ref={titleInputRef}
-              id="studio-look-title"
-              name="lookTitle"
-              type="text"
-              value={lookTitle}
-              onChange={handleTitleChange}
-              onBlur={handleTitleBlur}
-              maxLength={60}
-              required
-              placeholder="e.g. Atelier Smart Casual"
-              aria-invalid={titleError ? "true" : "false"}
-              aria-describedby={
-                titleError
-                  ? "studio-look-title-error studio-look-title-help"
-                  : "studio-look-title-help"
-              }
-              className={cn(
-                titleError &&
-                  "border-red-500 focus:border-red-600 focus:ring-red-200"
-              )}
-            />
-            {titleError && (
-              <p
-                id="studio-look-title-error"
-                role="alert"
-                className="flex items-center gap-1.5 text-xs font-semibold text-red-600"
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3.5">
+              <div>
+                <h2
+                  id="composer-controls-heading"
+                  className="flex items-center gap-2 text-base font-extrabold text-slate-950"
+                >
+                  <Layers className="h-4 w-4 text-[#6633EE]" aria-hidden="true" />
+                  Outfit Layer Controls
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  Choose up to 3 layers or skip any slot.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearCanvas}
+                disabled={selectedGarments.length === 0}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span>{titleError}</span>
-              </p>
-            )}
-          </form>
-        </section>
+                <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                Clear All
+              </button>
+            </div>
 
-        {/* Right: Live Outfit Canvas */}
-        <section
-          aria-labelledby="live-canvas-heading"
-          className="min-w-0 space-y-5 rounded-2xl border border-violet-200/80 bg-white/95 p-5 shadow-2xs sm:p-6 lg:col-span-7"
-        >
-          {/* Canvas Header (wraps cleanly at 375px) */}
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Live Outfit Canvas
-                </span>
+            {/* Manual Presets (Non-AI) */}
+            <div className="space-y-2">
+              <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Quick Catalogue Pairings (Manual)
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    applyManualPreset(
+                      "Editorial Studio Look",
+                      defaultSlots,
+                      "Loaded 3-layer pairing from the mock catalogue."
+                    )
+                  }
+                >
+                  Full 3-Layer
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    applyManualPreset(
+                      "Formal Work Pairing",
+                      {
+                        topId: "classic-navy-shirt",
+                        bottomId: "architectural-pleated-trouser",
+                        outerId: "",
+                      },
+                      "Loaded 2-piece Formal / Work pairing."
+                    )
+                  }
+                >
+                  Work Smart
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    applyManualPreset(
+                      "Relaxed Travel Look",
+                      {
+                        topId: "olive-linen-shirt",
+                        bottomId: "architectural-pleated-trouser",
+                        outerId: "",
+                      },
+                      "Loaded 2-piece Casual / Travel pairing."
+                    )
+                  }
+                >
+                  Casual Travel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleCycleTop}
+                >
+                  <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
+                  Swap Top
+                </Button>
+              </div>
+            </div>
+
+            {/* Layer Selectors */}
+            <div className="space-y-4">
+              {/* Top Layer */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="studio-top-select"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Top Layer (Shirts & Tees)
+                </label>
+                <select
+                  id="studio-top-select"
+                  value={topId}
+                  onChange={(e) => handleLayerChange("top", e.target.value)}
+                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                >
+                  <option value="">None (Skip top layer)</option>
+                  {tops.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
+                    </option>
+                  ))}
+                </select>
+                {topGarment ? (
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
+                      style={{ backgroundColor: topGarment.swatchHex }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {topGarment.fitType} Fit · {topGarment.fabric}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    No top layer selected.
+                  </p>
+                )}
+              </div>
+
+              {/* Bottom Layer */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="studio-bottom-select"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Bottom Layer (Trousers)
+                </label>
+                <select
+                  id="studio-bottom-select"
+                  value={bottomId}
+                  onChange={(e) => handleLayerChange("bottom", e.target.value)}
+                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                >
+                  <option value="">None (Skip bottom layer)</option>
+                  {bottoms.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
+                    </option>
+                  ))}
+                </select>
+                {bottomGarment ? (
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
+                      style={{ backgroundColor: bottomGarment.swatchHex }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {bottomGarment.fitType} Fit · {bottomGarment.fabric}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    No bottom layer selected.
+                  </p>
+                )}
+              </div>
+
+              {/* Outerwear Layer */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="studio-outer-select"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Outerwear Layer
+                </label>
+                <select
+                  id="studio-outer-select"
+                  value={outerId}
+                  onChange={(e) => handleLayerChange("outer", e.target.value)}
+                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                >
+                  <option value="">None (Skip outerwear layer)</option>
+                  {outer.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
+                    </option>
+                  ))}
+                </select>
+                {outerGarment ? (
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
+                      style={{ backgroundColor: outerGarment.swatchHex }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {outerGarment.fitType} Fit · {outerGarment.fabric}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    No outerwear layer selected.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Look Name Form */}
+            <form
+              id="studio-save-form"
+              onSubmit={handleSaveLook}
+              noValidate
+              className="space-y-2 border-t border-slate-100 pt-4"
+            >
+              <label
+                htmlFor="studio-look-title"
+                className="block text-xs font-bold text-slate-800"
+              >
+                Look Name <span className="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <p
+                id="studio-look-title-help"
+                className="text-[11px] text-slate-500"
+              >
+                Name this pairing (1–60 characters) before saving to your session
+                lookbook.
+              </p>
+              <Input
+                ref={titleInputRef}
+                id="studio-look-title"
+                name="lookTitle"
+                type="text"
+                value={lookTitle}
+                onChange={handleTitleChange}
+                onBlur={handleTitleBlur}
+                maxLength={60}
+                required
+                placeholder="e.g. Atelier Smart Casual"
+                aria-invalid={titleError ? "true" : "false"}
+                aria-describedby={
+                  titleError
+                    ? "studio-look-title-error studio-look-title-help"
+                    : "studio-look-title-help"
+                }
+                className={cn(
+                  titleError &&
+                    "border-red-500 focus:border-red-600 focus:ring-red-200"
+                )}
+              />
+              {titleError && (
+                <p
+                  id="studio-look-title-error"
+                  role="alert"
+                  className="flex items-center gap-1.5 text-xs font-semibold text-red-600"
+                >
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>{titleError}</span>
+                </p>
+              )}
+            </form>
+
+            {/* Garment Panel */}
+            <section
+              aria-labelledby="garment-panel-heading"
+              className="space-y-4 border-t border-slate-100 pt-4"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h3
+                  id="garment-panel-heading"
+                  className="flex items-center gap-2 text-sm font-extrabold text-slate-950"
+                >
+                  <Sparkles className="h-4 w-4 text-[#6633EE]" aria-hidden="true" />
+                  Dress Your Avatar
+                </h3>
                 <Badge variant="neutral" size="sm">
-                  {selectedGarments.length} of 3 layers
+                  Beta
                 </Badge>
               </div>
-              <h2
-                id="live-canvas-heading"
-                className="text-xl font-extrabold text-slate-950 break-words"
-              >
-                {displayTitle}
-              </h2>
-            </div>
+              <p className="text-xs text-slate-600">
+                Select a garment from the live catalogue, pick your size and fit
+                preference, and see it on your 3D avatar.
+              </p>
 
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <div
-                role="group"
-                aria-label="Studio stage view"
-                className="inline-flex rounded-xl border border-violet-200 bg-violet-50/70 p-0.5 text-[11px] font-semibold"
-              >
-                <button
-                  type="button"
-                  aria-pressed={stageMode === "canvas"}
-                  onClick={() => setStageMode("canvas")}
-                  className={cn(
-                    "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
-                    stageMode === "canvas"
-                      ? "bg-[#6633EE] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-950"
-                  )}
+              {/* Garment Type Selector */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="garment-panel-type"
+                  className="block text-xs font-bold text-slate-800"
                 >
-                  Outfit Canvas
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={stageMode === "avatar"}
-                  onClick={() => setStageMode("avatar")}
-                  className={cn(
-                    "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
-                    stageMode === "avatar"
-                      ? "bg-[#6633EE] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-950"
-                  )}
+                  Garment Type
+                </label>
+                <select
+                  id="garment-panel-type"
+                  value={garmentPanelGarmentType}
+                  onChange={(e) =>
+                    setGarmentPanelGarmentType(e.target.value as GarmentType)
+                  }
+                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                  disabled={garmentPanelCatalogueLoading}
                 >
-                  3D Avatar
-                </button>
+                  {GARMENT_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {stageMode === "canvas" && (
-                <div
-                  role="group"
-                  aria-label="Preview backdrop surface"
-                  className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-semibold"
+              {/* Catalogue Garment Picker */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="garment-panel-catalogue"
+                  className="block text-xs font-bold text-slate-800"
                 >
-                  {BACKDROP_OPTIONS.map((opt) => (
+                  Catalogue Garment
+                </label>
+                {garmentPanelCatalogueLoading ? (
+                  <div className="min-h-10 w-full rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#6633EE]" />
+                    <span className="ml-2 text-xs text-slate-500">Loading catalogue...</span>
+                  </div>
+                ) : garmentPanelCatalogue.length === 0 ? (
+                  <div className="min-h-10 w-full rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-xs text-slate-500">
+                    No garments available for this type.
+                  </div>
+                ) : (
+                  <select
+                    id="garment-panel-catalogue"
+                    value={garmentPanelSelectedProductId ?? ""}
+                    onChange={(e) =>
+                      setGarmentPanelSelectedProductId(e.target.value || null)
+                    }
+                    className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                  >
+                    <option value="">Select a garment...</option>
+                    {garmentPanelCatalogue.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} — ₹{g.priceInr.toLocaleString("en-IN")} ({g.color})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedGarmentPanelProduct ? (
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
+                      style={{ backgroundColor: selectedGarmentPanelProduct.swatchHex }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {selectedGarmentPanelProduct.fitType} Fit · {selectedGarmentPanelProduct.fabric}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">No garment selected.</p>
+                )}
+              </div>
+
+              {/* Size Buttons */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-800">
+                  Size
+                </label>
+                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Garment size">
+                  {SIZE_OPTIONS.map((sz) => (
                     <button
-                      key={opt.id}
+                      key={sz}
                       type="button"
-                      aria-pressed={backdrop === opt.id}
-                      onClick={() => setBackdrop(opt.id)}
+                      role="radio"
+                      aria-checked={garmentPanelSelectedSize === sz}
+                      onClick={() => setGarmentPanelSelectedSize(sz)}
                       className={cn(
-                        "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
-                        backdrop === opt.id
-                          ? "bg-[#6633EE] text-white"
-                          : "text-slate-600 hover:text-slate-950"
+                        "cursor-pointer min-h-10 min-w-[44px] rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                        garmentPanelSelectedSize === sz
+                          ? "bg-[#6633EE] border-[#6633EE] text-white"
+                          : garmentPanelRecommendedSize === sz
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                          : "border-slate-300 bg-white text-slate-900 hover:border-violet-400 hover:bg-violet-50"
                       )}
                     >
-                      {opt.label}
+                      {sz}
+                      {garmentPanelRecommendedSize === sz && garmentPanelSelectedSize !== sz && (
+                        <span className="ml-1 text-[10px] font-normal">Best</span>
+                      )}
                     </button>
                   ))}
                 </div>
-              )}
-
-              <span className="text-lg font-extrabold text-[#6633EE]">
-                ₹{totalInr.toLocaleString("en-IN")}
-              </span>
-            </div>
-          </div>
-
-          {stageMode === "avatar" ? (
-            <div className="space-y-4">
-              {avatarServiceOffline ? (
-                <div className="space-y-4">
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className="rounded-2xl border border-amber-300 bg-amber-50/95 p-4 text-xs text-amber-950 shadow-2xs"
-                  >
-                    <div className="flex items-center gap-2 font-bold text-amber-900">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-                      <span>Avatar service offline — Using deterministic fit preview</span>
-                    </div>
-                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
-                      The 3D avatar engine is temporarily offline (DEC-005: Never present
-                      fallback output as a real avatar). The silhouette below is an
-                      illustrative 2D proportional guide based on your saved measurements,
-                      not a 3D anatomical scan.
-                    </p>
-                  </div>
-                  <DigitalAvatarPreview
-                    metricsCm={{
-                      heightCm: bodyProfile.heightCm,
-                      chestCm: bodyProfile.chestCm,
-                      waistCm: bodyProfile.waistCm,
-                      hipCm: bodyProfile.hipCm,
-                      shoulderCm: bodyProfile.shoulderCm,
-                      sleeveCm: bodyProfile.sleeveCm,
-                      inseamCm: bodyProfile.inseamCm,
-                    }}
-                    unit="cm"
-                    fitPreference={bodyProfile.fitPreference}
-                    bodyType={bodyProfile.bodyType}
-                    weightKg={
-                      bodyProfile.weightKg
-                        ? String(bodyProfile.weightKg)
-                        : undefined
-                    }
-                    hasSavedProfile={hasBodyProfile}
-                    isEditing={false}
-                    activeZone="chestCm"
-                    onSelectZone={() => {}}
-                  />
-                </div>
-              ) : avatarId ? (
-                <Avatar3DViewer avatarId={avatarId} className="h-[460px]" />
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-violet-300 bg-violet-50/50 p-8 text-center">
-                  <Sparkles className="h-8 w-8 text-[#6633EE]" />
-                  <p className="mt-3 text-base font-extrabold text-slate-900">
-                    {hasBodyProfile
-                      ? "Calibrated 3D Avatar Ready to Build"
-                      : "Body Profile Required"}
+                {garmentPanelRecommendedSize && (
+                  <p className="text-[11px] text-emerald-700">
+                    <span className="font-semibold">Best fit:</span>{" "}
+                    {garmentPanelRecommendedSize} (from Fit Check for your
+                    {garmentPanelFitPreference} preference)
                   </p>
-                  <p className="mt-1 max-w-sm text-xs text-slate-600">
-                    {hasBodyProfile
-                      ? "Generate an interactive 3D SMPL mesh from your calibrated measurements to preview proportions in Style Studio."
-                      : "Save your Body Profile first to enable 3D avatar generation and proportional fit calibration."}
-                  </p>
-                  <div className="mt-4 flex gap-2">
-                    {hasBodyProfile ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleGenerateAvatar}
-                        disabled={isGeneratingAvatar}
-                        className="cursor-pointer"
-                      >
-                        {isGeneratingAvatar ? (
-                          <>
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                            Generating 3D Avatar...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                            Generate 3D Avatar
-                          </>
-                        )}
-                      </Button>
-                    ) : (
-                      <Link href="/body-profile">
-                        <Button type="button" size="sm">
-                          Go to Body Profile
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Canvas Preview Stage */
-            <div
-              className={cn(
-                "rounded-2xl border p-4 transition-colors sm:p-5",
-                activeBackdrop.stageClass
-              )}
-            >
-            {selectedSlots.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-violet-300/80 bg-white/95 p-8 text-center">
-                <Layers
-                  className="mx-auto h-8 w-8 text-violet-300"
-                  aria-hidden="true"
-                />
-                <p className="mt-3 text-base font-extrabold text-slate-950">
-                  Your outfit canvas is empty
-                </p>
-                <p className="mt-1 text-xs text-slate-600">
-                  Select a Top, Bottom, or Outerwear garment from Outfit Layer
-                  Controls, or load a manual catalogue pairing.
-                </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() =>
-                      applyManualPreset(
-                        DEFAULT_TITLE,
-                        defaultSlots,
-                        "Loaded default 3-layer pairing."
-                      )
-                    }
-                  >
-                    Load Default Pairing
-                  </Button>
-                  <Link href="/shop">
-                    <Button type="button" size="sm" variant="outline">
-                      Explore Shop
-                    </Button>
-                  </Link>
-                </div>
+                )}
               </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                {selectedSlots.map(({ slotKey, label, garment }) => {
-                  const hasValidImage =
-                    Boolean(garment.image) && !failedImages[garment.id];
-                  const chosenSize = getSizeForGarment(garment);
 
-                  return (
-                    <article
-                      key={`${slotKey}-${garment.id}`}
+              {/* Fit Preference Selector */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-800">
+                  Fit Preference
+                </label>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Fit preference">
+                  {FIT_PREFERENCE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={garmentPanelFitPreference === opt.value}
+                      onClick={() => setGarmentPanelFitPreference(opt.value)}
                       className={cn(
-                        "flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs",
-                        activeBackdrop.dark
-                          ? "border-slate-700 bg-slate-800/95 text-slate-100"
-                          : "border-slate-200/80 bg-white/95 text-slate-900"
+                        "cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                        garmentPanelFitPreference === opt.value
+                          ? "bg-[#6633EE] border-[#6633EE] text-white"
+                          : "border-slate-300 bg-white text-slate-900 hover:border-violet-400 hover:bg-violet-50"
                       )}
                     >
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={cn(
-                              "text-[10px] font-bold uppercase tracking-wider",
-                              activeBackdrop.dark
-                                ? "text-violet-300"
-                                : "text-[#4C1D95]"
-                            )}
-                          >
-                            {label}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleLayerChange(slotKey, "")}
-                            aria-label={`Remove ${garment.name} from ${label}`}
-                            className={cn(
-                              "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
-                              activeBackdrop.dark
-                                ? "text-slate-300 hover:bg-slate-700 hover:text-white"
-                                : "text-slate-400 hover:bg-slate-100 hover:text-slate-900"
-                            )}
-                          >
-                            <X className="h-3.5 w-3.5" aria-hidden="true" />
-                          </button>
-                        </div>
+                      {opt.label} (+{opt.easeCm} cm)
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                        <Link
-                          href={`/shop/${garment.id}`}
-                          className="group relative mt-2 block aspect-[4/4] w-full overflow-hidden rounded-xl border border-slate-200/70 bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]"
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleDressAvatar}
+                  disabled={garmentPanelLoading || !avatarId || avatarServiceOffline || !garmentPanelSelectedProductId}
+                  className="flex-1 min-w-[140px]"
+                >
+                  {garmentPanelLoading ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      Dressing Avatar...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      Dress Avatar
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRemoveGarment}
+                  disabled={!garmentPanelDressedUrl}
+                  className="flex-1 min-w-[140px]"
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Remove Garment
+                </Button>
+              </div>
+
+              {/* Error / Status Messages */}
+              {garmentPanelError && (
+                <div
+                  role="alert"
+                  className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                >
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>{garmentPanelError}</span>
+                </div>
+              )}
+              {!avatarId && !garmentPanelError && !garmentPanelLoading && (
+                <div
+                  className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                  <span>Create your avatar first to use the dressing feature.</span>
+                </div>
+              )}
+              {avatarServiceOffline && !garmentPanelError && !garmentPanelLoading && (
+                <div
+                  className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                  <span>Avatar service offline — dressing unavailable.</span>
+                </div>
+              )}
+              {garmentPanelDressedUrl && !garmentPanelError && !garmentPanelLoading && (
+                <div
+                  className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  <span>Garment applied to avatar. Switch to 3D Avatar view to see it.</span>
+                </div>
+              )}
+            </section>
+          </section>
+
+          {/* Right: Live Outfit Canvas */}
+          <section
+            aria-labelledby="live-canvas-heading"
+            className="min-w-0 space-y-5 rounded-2xl border border-violet-200/80 bg-white/95 p-5 shadow-2xs sm:p-6 lg:col-span-7"
+          >
+            {/* Canvas Header (wraps cleanly at 375px) */}
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Live Outfit Canvas
+                  </span>
+                  <Badge variant="neutral" size="sm">
+                    {selectedGarments.length} of 3 layers
+                  </Badge>
+                </div>
+                <h2
+                  id="live-canvas-heading"
+                  className="text-xl font-extrabold text-slate-950 break-words"
+                >
+                  {displayTitle}
+                </h2>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <div
+                  role="group"
+                  aria-label="Studio stage view"
+                  className="inline-flex rounded-xl border border-violet-200 bg-violet-50/70 p-0.5 text-[11px] font-semibold"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={stageMode === "canvas"}
+                    onClick={() => setStageMode("canvas")}
+                    className={cn(
+                      "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                      stageMode === "canvas"
+                        ? "bg-[#6633EE] text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-950"
+                    )}
+                  >
+                    Outfit Canvas
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={stageMode === "avatar"}
+                    onClick={() => setStageMode("avatar")}
+                    className={cn(
+                      "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                      stageMode === "avatar"
+                        ? "bg-[#6633EE] text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-950"
+                    )}
+                  >
+                    3D Avatar
+                  </button>
+                </div>
+
+                {stageMode === "canvas" && (
+                  <div
+                    role="group"
+                    aria-label="Preview backdrop surface"
+                    className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-semibold"
+                  >
+                    {BACKDROP_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        aria-pressed={backdrop === opt.id}
+                        onClick={() => setBackdrop(opt.id)}
+                        className={cn(
+                          "cursor-pointer rounded-lg px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                          backdrop === opt.id
+                            ? "bg-[#6633EE] text-white"
+                            : "text-slate-600 hover:text-slate-950"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <span className="text-lg font-extrabold text-[#6633EE]">
+                  ₹{totalInr.toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+
+            {stageMode === "avatar" ? (
+              <div className="space-y-4">
+                {avatarServiceOffline ? (
+                  <div className="space-y-4">
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="rounded-2xl border border-amber-300 bg-amber-50/95 p-4 text-xs text-amber-950 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2 font-bold text-amber-900">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                        <span>Avatar service offline — Using deterministic fit preview</span>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
+                        The 3D avatar engine is temporarily offline (DEC-005: Never present
+                        fallback output as a real avatar). The silhouette below is an
+                        illustrative 2D proportional guide based on your saved measurements,
+                        not a 3D anatomical scan.
+                      </p>
+                    </div>
+                    <DigitalAvatarPreview
+                      metricsCm={{
+                        heightCm: bodyProfile.heightCm,
+                        chestCm: bodyProfile.chestCm,
+                        waistCm: bodyProfile.waistCm,
+                        hipCm: bodyProfile.hipCm,
+                        shoulderCm: bodyProfile.shoulderCm,
+                        sleeveCm: bodyProfile.sleeveCm,
+                        inseamCm: bodyProfile.inseamCm,
+                      }}
+                      unit="cm"
+                      fitPreference={bodyProfile.fitPreference}
+                      bodyType={bodyProfile.bodyType}
+                      weightKg={
+                        bodyProfile.weightKg
+                          ? String(bodyProfile.weightKg)
+                          : undefined
+                      }
+                      hasSavedProfile={hasBodyProfile}
+                      isEditing={false}
+                      activeZone="chestCm"
+                      onSelectZone={() => {}}
+                    />
+                  </div>
+                ) : avatarId ? (
+                  <Avatar3DViewer
+                    avatarId={avatarId}
+                    garmentUrl={garmentPanelDressedUrl}
+                    className="h-[460px]"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-violet-300 bg-violet-50/50 p-8 text-center">
+                    <Sparkles className="h-8 w-8 text-[#6633EE]" />
+                    <p className="mt-3 text-base font-extrabold text-slate-900">
+                      {hasBodyProfile
+                        ? "Calibrated 3D Avatar Ready to Build"
+                        : "Body Profile Required"}
+                    </p>
+                    <p className="mt-1 max-w-sm text-xs text-slate-600">
+                      {hasBodyProfile
+                        ? "Generate an interactive 3D SMPL mesh from your calibrated measurements to preview proportions in Style Studio."
+                        : "Save your Body Profile first to enable 3D avatar generation and proportional fit calibration."}
+                    </p>
+                    <div className="mt-4 flex gap-2">
+                      {hasBodyProfile ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleGenerateAvatar}
+                          disabled={isGeneratingAvatar}
+                          className="cursor-pointer"
                         >
-                          {hasValidImage ? (
-                            <Image
-                              src={garment.image!}
-                              alt={`${garment.name} in ${garment.color}`}
-                              fill
-                              sizes="(max-width: 640px) 100vw, 220px"
-                              onError={() =>
-                                setFailedImages((prev) => ({
-                                  ...prev,
-                                  [garment.id]: true,
-                                }))
-                              }
-                              className="object-cover object-top transition-transform duration-300 group-hover:scale-105"
-                            />
+                          {isGeneratingAvatar ? (
+                            <>
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                              Generating 3D Avatar...
+                            </>
                           ) : (
-                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center">
-                              <div
-                                className="h-14 w-12 rounded-lg border border-black/10 shadow-xs"
-                                style={{
-                                  backgroundColor:
-                                    garment.swatchHex || "#E2E8F0",
-                                }}
-                                aria-hidden="true"
-                              />
-                              <span className="text-[11px] font-semibold text-slate-600">
-                                {garment.color} Swatch
-                              </span>
-                            </div>
+                            <>
+                              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                              Generate 3D Avatar
+                            </>
                           )}
+                        </Button>
+                      ) : (
+                        <Link href="/body-profile">
+                          <Button type="button" size="sm">
+                            Go to Body Profile
+                          </Button>
                         </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Canvas Preview Stage */
+              <div
+                className={cn(
+                  "rounded-2xl border p-4 transition-colors sm:p-5",
+                  activeBackdrop.stageClass
+                )}
+              >
+              {selectedSlots.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-violet-300/80 bg-white/95 p-8 text-center">
+                  <Layers
+                    className="mx-auto h-8 w-8 text-violet-300"
+                    aria-hidden="true"
+                  />
+                  <p className="mt-3 text-base font-extrabold text-slate-950">
+                    Your outfit canvas is empty
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Select a Top, Bottom, or Outerwear garment from Outfit Layer
+                    Controls, or load a manual catalogue pairing.
+                  </p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() =>
+                        applyManualPreset(
+                          DEFAULT_TITLE,
+                          defaultSlots,
+                          "Loaded default 3-layer pairing."
+                        )
+                      }
+                    >
+                      Load Default Pairing
+                    </Button>
+                    <Link href="/shop">
+                      <Button type="button" size="sm" variant="outline">
+                        Explore Shop
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                  {selectedSlots.map(({ slotKey, label, garment }) => {
+                    const hasValidImage =
+                      Boolean(garment.image) && !failedImages[garment.id];
+                    const chosenSize = getSizeForGarment(garment);
 
-                        <div className="mt-3 space-y-1">
+                    return (
+                      <article
+                        key={`${slotKey}-${garment.id}`}
+                        className={cn(
+                          "flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs",
+                          activeBackdrop.dark
+                            ? "border-slate-700 bg-slate-800/95 text-slate-100"
+                            : "border-slate-200/80 bg-white/95 text-slate-900"
+                        )}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={cn(
+                                "text-[10px] font-bold uppercase tracking-wider",
+                                activeBackdrop.dark
+                                  ? "text-violet-300"
+                                  : "text-[#4C1D95]"
+                              )}
+                            >
+                              {label}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleLayerChange(slotKey, "")}
+                              aria-label={`Remove ${garment.name} from ${label}`}
+                              className={cn(
+                                "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]",
+                                activeBackdrop.dark
+                                  ? "text-slate-300 hover:bg-slate-700 hover:text-white"
+                                  : "text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+                              )}
+                            >
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                          </div>
+
                           <Link
                             href={`/shop/${garment.id}`}
-                            className={cn(
-                              "block text-sm font-extrabold leading-snug hover:underline break-words",
-                              activeBackdrop.dark
-                                ? "text-white"
-                                : "text-slate-950"
-                            )}
+                            className="group relative mt-2 block aspect-[4/4] w-full overflow-hidden rounded-xl border border-slate-200/70 bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6633EE]"
                           >
-                            {garment.name}
+                            {hasValidImage ? (
+                              <Image
+                                src={garment.image!}
+                                alt={`${garment.name} in ${garment.color}`}
+                                fill
+                                sizes="(max-width: 640px) 100vw, 220px"
+                                onError={() =>
+                                  setFailedImages((prev) => ({
+                                    ...prev,
+                                    [garment.id]: true,
+                                  }))
+                                }
+                                className="object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center">
+                                <div
+                                  className="h-14 w-12 rounded-lg border border-black/10 shadow-xs"
+                                  style={{
+                                    backgroundColor:
+                                      garment.swatchHex || "#E2E8F0",
+                                  }}
+                                  aria-hidden="true"
+                                />
+                                <span className="text-[11px] font-semibold text-slate-600">
+                                  {garment.color} Swatch
+                                </span>
+                              </div>
+                            )}
                           </Link>
-                          <p
+
+                          <div className="mt-3 space-y-1">
+                            <Link
+                              href={`/shop/${garment.id}`}
+                              className={cn(
+                                "block text-sm font-extrabold leading-snug hover:underline break-words",
+                                activeBackdrop.dark
+                                  ? "text-white"
+                                  : "text-slate-950"
+                              )}
+                            >
+                              {garment.name}
+                            </Link>
+                            <p
+                              className={cn(
+                                "text-[11px]",
+                                activeBackdrop.dark
+                                  ? "text-slate-300"
+                                  : "text-slate-600"
+                              )}
+                            >
+                              {garment.fitType} Fit · {garment.color}
+                            </p>
+                            <p
+                              className={cn(
+                                "text-xs font-bold",
+                                activeBackdrop.dark
+                                  ? "text-violet-300"
+                                  : "text-slate-900"
+                              )}
+                            >
+                              ₹{garment.priceInr.toLocaleString("en-IN")}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Per-Layer Cart Size Control */}
+                        <div
+                          className={cn(
+                            "mt-3 flex items-center justify-between gap-2 border-t pt-2.5",
+                            activeBackdrop.dark
+                              ? "border-slate-700"
+                              : "border-slate-100"
+                          )}
+                        >
+                          <label
+                            htmlFor={`studio-size-${slotKey}`}
                             className={cn(
-                              "text-[11px]",
+                              "text-[11px] font-semibold",
                               activeBackdrop.dark
                                 ? "text-slate-300"
                                 : "text-slate-600"
                             )}
                           >
-                            {garment.fitType} Fit · {garment.color}
-                          </p>
-                          <p
+                            Bag Size{" "}
+                            <span
+                              className={cn(
+                                "font-normal",
+                                activeBackdrop.dark
+                                  ? "text-slate-400"
+                                  : "text-slate-500"
+                              )}
+                            >
+                              (Required)
+                            </span>
+                          </label>
+                          <select
+                            id={`studio-size-${slotKey}`}
+                            value={chosenSize}
+                            aria-invalid={Boolean(canvasError && !chosenSize)}
+                            onChange={(e) => {
+                              const nextVal = e.target.value;
+                              setCanvasError(null);
+                              setGarmentSizes((prev) => {
+                                if (!nextVal) {
+                                  const next = { ...prev };
+                                  delete next[garment.id];
+                                  return next;
+                                }
+                                return {
+                                  ...prev,
+                                  [garment.id]: nextVal as GarmentSize,
+                                };
+                              });
+                            }}
                             className={cn(
-                              "text-xs font-bold",
-                              activeBackdrop.dark
-                                ? "text-violet-300"
-                                : "text-slate-900"
+                              "min-h-8 rounded-md border bg-white px-2 py-1 text-xs font-bold text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20",
+                              canvasError && !chosenSize
+                                ? "border-red-500 ring-1 ring-red-400"
+                                : "border-slate-300"
                             )}
                           >
-                            ₹{garment.priceInr.toLocaleString("en-IN")}
-                          </p>
+                            <option value="">Choose size...</option>
+                            {garment.sizes.map((sz) => (
+                              <option key={sz} value={sz}>
+                                {sz}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      </div>
-
-                      {/* Per-Layer Cart Size Control */}
-                      <div
-                        className={cn(
-                          "mt-3 flex items-center justify-between gap-2 border-t pt-2.5",
-                          activeBackdrop.dark
-                            ? "border-slate-700"
-                            : "border-slate-100"
-                        )}
-                      >
-                        <label
-                          htmlFor={`studio-size-${slotKey}`}
-                          className={cn(
-                            "text-[11px] font-semibold",
-                            activeBackdrop.dark
-                              ? "text-slate-300"
-                              : "text-slate-600"
-                          )}
-                        >
-                          Bag Size{" "}
-                          <span
-                            className={cn(
-                              "font-normal",
-                              activeBackdrop.dark
-                                ? "text-slate-400"
-                                : "text-slate-500"
-                            )}
-                          >
-                            (Required)
-                          </span>
-                        </label>
-                        <select
-                          id={`studio-size-${slotKey}`}
-                          value={chosenSize}
-                          aria-invalid={Boolean(canvasError && !chosenSize)}
-                          onChange={(e) => {
-                            const nextVal = e.target.value;
-                            setCanvasError(null);
-                            setGarmentSizes((prev) => {
-                              if (!nextVal) {
-                                const next = { ...prev };
-                                delete next[garment.id];
-                                return next;
-                              }
-                              return {
-                                ...prev,
-                                [garment.id]: nextVal as GarmentSize,
-                              };
-                            });
-                          }}
-                          className={cn(
-                            "min-h-8 rounded-md border bg-white px-2 py-1 text-xs font-bold text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20",
-                            canvasError && !chosenSize
-                              ? "border-red-500 ring-1 ring-red-400"
-                              : "border-slate-300"
-                          )}
-                        >
-                          <option value="">Choose size...</option>
-                          {garment.sizes.map((sz) => (
-                            <option key={sz} value={sz}>
-                              {sz}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </article>
-                  );
-                })}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
               </div>
             )}
-          </div>
-          )}
 
-          {/* Truthful Palette & Garment Summary */}
-          {selectedGarments.length > 0 && (
-            <div className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 text-xs sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-slate-500">
-                  <Palette className="h-3.5 w-3.5 text-[#6633EE]" aria-hidden="true" />
-                  Outfit Colour Palette
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {selectedGarments.map((g) => (
-                    <span
-                      key={`palette-${g.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-800"
-                    >
+            {/* Truthful Palette & Garment Summary */}
+            {selectedGarments.length > 0 && (
+              <div className="grid gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 text-xs sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-slate-500">
+                    <Palette className="h-3.5 w-3.5 text-[#6633EE]" aria-hidden="true" />
+                    Outfit Colour Palette
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedGarments.map((g) => (
                       <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
-                        style={{ backgroundColor: g.swatchHex }}
-                        aria-hidden="true"
-                      />
-                      {g.color}
-                    </span>
-                  ))}
+                        key={`palette-${g.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-800"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full border border-black/15"
+                          style={{ backgroundColor: g.swatchHex }}
+                          aria-hidden="true"
+                        />
+                        {g.color}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="font-bold uppercase tracking-wider text-slate-500">
+                    Silhouettes & Occasions
+                  </span>
+                  <p className="font-semibold text-slate-800 break-words">
+                    {uniqueFits.join(" · ")}
+                  </p>
+                  <p className="text-slate-600 break-words">
+                    {uniqueOccasions.join(" · ")}
+                  </p>
                 </div>
               </div>
+            )}
 
-              <div className="space-y-1.5">
-                <span className="font-bold uppercase tracking-wider text-slate-500">
-                  Silhouettes &amp; Occasions
-                </span>
-                <p className="font-semibold text-slate-800 break-words">
-                  {uniqueFits.join(" · ")}
-                </p>
-                <p className="text-slate-600 break-words">
-                  {uniqueOccasions.join(" · ")}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Validation & Save Confirmation Feedback */}
-          {canvasError && (
-            <p
-              role="alert"
-              className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-700"
-            >
-              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{canvasError}</span>
-            </p>
-          )}
-
-          {savedTitleBanner && (
-            <div
-              role="status"
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900"
-            >
-              <span className="inline-flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  &ldquo;{savedTitleBanner}&rdquo; saved to your local Saved
-                  Looks gallery!
-                </span>
-              </span>
-              <Link
-                href="/saved-looks"
-                className="inline-flex items-center gap-1 font-bold text-emerald-950 underline-offset-2 hover:underline"
+            {/* Validation & Save Confirmation Feedback */}
+            {canvasError && (
+              <p
+                role="alert"
+                className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-700"
               >
-                Open Saved Looks
-                <ArrowRight className="h-3 w-3" aria-hidden="true" />
-              </Link>
-            </div>
-          )}
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{canvasError}</span>
+              </p>
+            )}
 
-          {/* Primary Actions */}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" form="studio-save-form">
-              <Bookmark className="h-4 w-4" aria-hidden="true" />
-              {isEditingExistingLook ? "Update Saved Look" : "Save Look"}
-            </Button>
+            {savedTitleBanner && (
+              <div
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-900"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    &ldquo;{savedTitleBanner}&rdquo; saved to your local Saved
+                    Looks gallery!
+                  </span>
+                </span>
+                <Link
+                  href="/saved-looks"
+                  className="inline-flex items-center gap-1 font-bold text-emerald-950 underline-offset-2 hover:underline"
+                >
+                  Open Saved Looks
+                  <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                </Link>
+              </div>
+            )}
 
-            {isEditingExistingLook && (
+            {/* Primary Actions */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" form="studio-save-form">
+                <Bookmark className="h-4 w-4" aria-hidden="true" />
+                {isEditingExistingLook ? "Update Saved Look" : "Save Look"}
+              </Button>
+
+              {isEditingExistingLook && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => persistLook("new")}
+                >
+                  Save as New Look
+                </Button>
+              )}
+
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => persistLook("new")}
+                onClick={handleAddAllToCart}
               >
-                Save as New Look
+                {justAdded ? (
+                  <>
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                    Added to Bag
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                    {addCartLabel}
+                  </>
+                )}
               </Button>
-            )}
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleAddAllToCart}
-            >
-              {justAdded ? (
-                <>
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                  Added to Bag
-                </>
+              {primaryTryOnGarment ? (
+                <Link
+                  href={`/try-on?product=${encodeURIComponent(
+                    primaryTryOnGarment.id
+                  )}`}
+                >
+                  <Button type="button" variant="secondary">
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Try On in Fitting Room
+                  </Button>
+                </Link>
               ) : (
-                <>
-                  <ShoppingBag className="h-4 w-4" aria-hidden="true" />
-                  {addCartLabel}
-                </>
-              )}
-            </Button>
-
-            {primaryTryOnGarment ? (
-              <Link
-                href={`/try-on?product=${encodeURIComponent(
-                  primaryTryOnGarment.id
-                )}`}
-              >
-                <Button type="button" variant="secondary">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleEmptyTryOn}
+                >
                   <Sparkles className="h-4 w-4" aria-hidden="true" />
                   Try On in Fitting Room
                 </Button>
-              </Link>
-            ) : (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleEmptyTryOn}
-              >
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                Try On in Fitting Room
-              </Button>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Local Session Lookbook */}
-      <section
-        aria-labelledby="session-lookbook-heading"
-        className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-2xs sm:p-6"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div className="min-w-0">
-            <h2
-              id="session-lookbook-heading"
-              className="text-lg font-extrabold text-slate-950"
-            >
-              Session Lookbook ({savedLooks.length})
-            </h2>
-            <p className="mt-0.5 text-xs text-slate-600">
-              Load any saved outfit back into the composer or manage looks in
-              Saved Looks (stored in local session state only).
-            </p>
-          </div>
-          <Link
-            href="/saved-looks"
-            className="text-xs font-bold text-[#6633EE] hover:underline"
-          >
-            Open Saved Looks Gallery →
-          </Link>
+              )}
+            </div>
+          </section>
         </div>
 
-        {savedLooks.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 p-8 text-center">
-            <Bookmark
-              className="mx-auto h-7 w-7 text-violet-300"
-              aria-hidden="true"
-            />
-            <p className="mt-2.5 text-sm font-bold text-slate-950">
-              No saved looks in this session yet
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
-              Compose an outfit above, enter a look name, and click Save Look to
-              store it here.
-            </p>
+        {/* Local Session Lookbook */}
+        <section
+          aria-labelledby="session-lookbook-heading"
+          className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-2xs sm:p-6"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="min-w-0">
+              <h2
+                id="session-lookbook-heading"
+                className="text-lg font-extrabold text-slate-950"
+              >
+                Session Lookbook ({savedLooks.length})
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-600">
+                Load any saved outfit back into the composer or manage looks in
+                Saved Looks (stored in local session state only).
+              </p>
+            </div>
+            <Link
+              href="/saved-looks"
+              className="text-xs font-bold text-[#6633EE] hover:underline"
+            >
+              Open Saved Looks Gallery →
+            </Link>
           </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {savedLooks.map((look) => {
-              const items = look.garmentIds
-                .map((gid) => MOCK_GARMENTS.find((g) => g.id === gid))
-                .filter((g): g is MockGarment => Boolean(g));
-              const isLoaded = activeLookId === look.id;
 
-              return (
-                <article
-                  key={look.id}
-                  className={cn(
-                    "flex flex-col justify-between rounded-xl border p-4 transition-colors",
-                    isLoaded
-                      ? "border-[#6633EE] bg-violet-50/50"
-                      : "border-slate-200/80 bg-slate-50/60"
-                  )}
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Badge variant="neutral" size="sm">
-                        {look.source}
-                      </Badge>
-                      <span className="text-[11px] text-slate-500">
-                        {look.createdAt}
-                      </span>
-                    </div>
+          {savedLooks.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 p-8 text-center">
+              <Bookmark
+                className="mx-auto h-7 w-7 text-violet-300"
+                aria-hidden="true"
+              />
+              <p className="mt-2.5 text-sm font-bold text-slate-950">
+                No saved looks in this session yet
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Compose an outfit above, enter a look name, and click Save Look to
+                store it here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {savedLooks.map((look) => {
+                const items = look.garmentIds
+                  .map((gid) => MOCK_GARMENTS.find((g) => g.id === gid))
+                  .filter((g): g is MockGarment => Boolean(g));
+                const isLoaded = activeLookId === look.id;
 
-                    <h3 className="mt-2.5 text-sm font-extrabold text-slate-950 break-words">
-                      {look.title || "Untitled Studio Look"}
-                    </h3>
+                return (
+                  <article
+                    key={look.id}
+                    className={cn(
+                      "flex flex-col justify-between rounded-xl border p-4 transition-colors",
+                      isLoaded
+                        ? "border-[#6633EE] bg-violet-50/50"
+                        : "border-slate-200/80 bg-slate-50/60"
+                    )}
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Badge variant="neutral" size="sm">
+                          {look.source}
+                        </Badge>
+                        <span className="text-[11px] text-slate-500">
+                          {look.createdAt}
+                        </span>
+                      </div>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {items.map((g) => {
-                        const showImg =
-                          Boolean(g.image) && !failedImages[g.id];
-                        return showImg ? (
-                          <div
-                            key={`${look.id}-${g.id}`}
-                            className="relative h-12 w-10 overflow-hidden rounded-lg border border-slate-200 bg-white"
-                          >
-                            <Image
-                              src={g.image!}
-                              alt={g.name}
-                              fill
-                              sizes="40px"
-                              onError={() =>
-                                setFailedImages((prev) => ({
-                                  ...prev,
-                                  [g.id]: true,
-                                }))
-                              }
-                              className="object-cover object-top"
+                      <h3 className="mt-2.5 text-sm font-extrabold text-slate-950 break-words">
+                        {look.title || "Untitled Studio Look"}
+                      </h3>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {items.map((g) => {
+                          const showImg =
+                            Boolean(g.image) && !failedImages[g.id];
+                          return showImg ? (
+                            <div
+                              key={`${look.id}-${g.id}`}
+                              className="relative h-12 w-10 overflow-hidden rounded-lg border border-slate-200 bg-white"
+                            >
+                              <Image
+                                src={g.image!}
+                                alt={g.name}
+                                fill
+                                sizes="40px"
+                                onError={() =>
+                                  setFailedImages((prev) => ({
+                                    ...prev,
+                                    [g.id]: true,
+                                  }))
+                                }
+                                className="object-cover object-top"
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              key={`${look.id}-${g.id}`}
+                              title={g.name}
+                              className="h-12 w-10 rounded-lg border border-slate-200"
+                              style={{ backgroundColor: g.swatchHex }}
+                              aria-hidden="true"
                             />
-                          </div>
-                        ) : (
-                          <div
-                            key={`${look.id}-${g.id}`}
-                            title={g.name}
-                            className="h-12 w-10 rounded-lg border border-slate-200"
-                            style={{ backgroundColor: g.swatchHex }}
-                            aria-hidden="true"
-                          />
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+
+                      <p className="mt-2.5 text-xs text-slate-600 break-words">
+                        {items.length > 0
+                          ? items.map((g) => g.name).join(" + ")
+                          : "Referenced garments unavailable."}
+                      </p>
                     </div>
 
-                    <p className="mt-2.5 text-xs text-slate-600 break-words">
-                      {items.length > 0
-                        ? items.map((g) => g.name).join(" + ")
-                        : "Referenced garments unavailable."}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex items-center gap-2 border-t border-slate-200/70 pt-3">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={isLoaded ? "secondary" : "outline"}
-                      className="flex-1"
-                      onClick={() =>
-                        applySavedLookToCanvas(look, "Loaded look into canvas:")
-                      }
-                    >
-                      {isLoaded ? "Loaded in Canvas" : "Load in Canvas"}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      aria-label={`Delete ${look.title || "saved look"}`}
-                      onClick={() => handleDeleteSessionLook(look)}
-                    >
-                      <Trash2
-                        className="h-4 w-4 text-red-600"
-                        aria-hidden="true"
-                      />
-                    </Button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                    <div className="mt-4 flex items-center gap-2 border-t border-slate-200/70 pt-3">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isLoaded ? "secondary" : "outline"}
+                        className="flex-1"
+                        onClick={() =>
+                          applySavedLookToCanvas(look, "Loaded look into canvas:")
+                        }
+                      >
+                        {isLoaded ? "Loaded in Canvas" : "Load in Canvas"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Delete ${look.title || "saved look"}`}
+                        onClick={() => handleDeleteSessionLook(look)}
+                      >
+                        <Trash2
+                          className="h-4 w-4 text-red-600"
+                          aria-hidden="true"
+                        />
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
         </>
       )}
     </div>

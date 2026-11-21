@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { api } from "./client";
 import { ApiError } from "./types";
+import type { AvatarDressInput, AvatarDressResponse } from "./types";
 
 describe("api client", () => {
   beforeEach(() => {
@@ -160,5 +161,132 @@ describe("api client", () => {
         }),
       })
     );
+  });
+
+  it("calls dressAvatar with body payload", async () => {
+    const mockDressResult: AvatarDressResponse = {
+      mode: "live_ai",
+      garment: {
+        type: "shirt",
+        size: "M",
+        fitPreference: "regular",
+        url: "/api/avatar/assets/avatar-123/garment_shirt_M.glb",
+      },
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ok: true, data: mockDressResult }),
+    } as unknown as Response);
+
+    const input: AvatarDressInput = {
+      avatarId: "avatar-123",
+      garmentType: "shirt",
+      size: "M",
+      fitPreference: "regular",
+    };
+    const result = await api.dressAvatar(input);
+    expect(result).toEqual(mockDressResult);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/avatar/dress",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(input),
+      })
+    );
+  });
+
+  it("handles dressAvatar 401 unauthorized", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        ok: false,
+        error: { code: "UNAUTHORIZED", message: "Please sign in" },
+      }),
+    } as unknown as Response);
+
+    await expect(
+      api.dressAvatar({
+        avatarId: "avatar-123",
+        garmentType: "shirt",
+        size: "M",
+      })
+    ).rejects.toThrow(ApiError);
+
+    try {
+      await api.dressAvatar({
+        avatarId: "avatar-123",
+        garmentType: "shirt",
+        size: "M",
+      });
+    } catch (err) {
+      const apiErr = err as ApiError;
+      expect(apiErr.status).toBe(401);
+      expect(apiErr.code).toBe("UNAUTHORIZED");
+      expect(apiErr.message).toBe("Please sign in");
+    }
+  });
+
+  it("handles dressAvatar 404 avatar not found", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        ok: false,
+        error: { code: "AVATAR_NOT_FOUND", message: "Avatar not found" },
+      }),
+    } as unknown as Response);
+
+    await expect(
+      api.dressAvatar({
+        avatarId: "avatar-123",
+        garmentType: "shirt",
+        size: "M",
+      })
+    ).rejects.toThrow(ApiError);
+  });
+
+  it("handles dressAvatar 422 validation error", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        ok: false,
+        error: { code: "VALIDATION_ERROR", message: "Invalid garment type" },
+      }),
+    } as unknown as Response);
+
+    await expect(
+      api.dressAvatar({
+        avatarId: "avatar-123",
+        garmentType: "invalid" as "tshirt" | "shirt" | "trousers" | "kurti",
+        size: "M",
+      })
+    ).rejects.toThrow(ApiError);
+  });
+
+  it("handles dressAvatar 503 service unavailable", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({
+        ok: false,
+        error: { code: "SERVICE_UNAVAILABLE", message: "Avatar engine offline" },
+      }),
+    } as unknown as Response);
+
+    await expect(
+      api.dressAvatar({
+        avatarId: "avatar-123",
+        garmentType: "shirt",
+        size: "M",
+      })
+    ).rejects.toThrow(ApiError);
   });
 });

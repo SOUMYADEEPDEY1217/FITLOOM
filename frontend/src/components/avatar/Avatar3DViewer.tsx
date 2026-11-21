@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 export interface Avatar3DViewerProps {
   avatarId: string;
+  garmentUrl?: string | null;
   className?: string;
   fallbackContent?: React.ReactNode;
   onError?: (error: Error) => void;
@@ -17,6 +18,7 @@ export interface Avatar3DViewerProps {
 
 export function Avatar3DViewer({
   avatarId,
+  garmentUrl,
   className,
   fallbackContent,
   onError,
@@ -31,6 +33,7 @@ export function Avatar3DViewer({
   // References to mutable Three.js objects
   const sceneRef = useRef<THREE.Scene | null>(null);
   const currentModelRef = useRef<THREE.Group | null>(null);
+  const currentGarmentRef = useRef<THREE.Group | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
@@ -194,6 +197,83 @@ export function Avatar3DViewer({
       isMounted = false;
     };
   }, [avatarId, pose, onError]);
+
+  // Load garment model when garmentUrl changes
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    let isMounted = true;
+
+    // Remove previous garment
+    if (currentGarmentRef.current) {
+      scene.remove(currentGarmentRef.current);
+      // Dispose geometries and materials
+      currentGarmentRef.current.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) {
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach((m) => m.dispose());
+            } else {
+              mesh.material.dispose();
+            }
+          }
+        }
+      });
+      currentGarmentRef.current = null;
+    }
+
+    if (!garmentUrl) return;
+
+    const loader = new GLTFLoader();
+    loader.load(
+      garmentUrl,
+      (gltf) => {
+        if (!isMounted) return;
+
+        const garment = gltf.scene;
+        garment.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            // Use double-sided material for garment
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach((mat) => {
+                  if (mat instanceof THREE.MeshStandardMaterial) {
+                    mat.side = THREE.DoubleSide;
+                    mat.roughness = 0.5;
+                    mat.metalness = 0.1;
+                  }
+                });
+              } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
+                mesh.material.side = THREE.DoubleSide;
+                mesh.material.roughness = 0.5;
+                mesh.material.metalness = 0.1;
+              }
+            }
+          }
+        });
+
+        // Garment uses same coordinate frame as avatar (no extra transform unless visibly misaligned)
+        scene.add(garment);
+        currentGarmentRef.current = garment;
+      },
+      undefined,
+      (err) => {
+        if (!isMounted) return;
+        console.warn("Failed to load garment:", err);
+        // Don't set loadError for garment - it's optional
+      }
+    );
+
+    return () => {
+      isMounted = false;
+    };
+  }, [garmentUrl]);
 
   function handleResetCamera() {
     if (!cameraRef.current || !controlsRef.current) return;
