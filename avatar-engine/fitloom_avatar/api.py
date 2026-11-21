@@ -8,10 +8,10 @@ from fastapi.responses import FileResponse, RedirectResponse
 from starlette.responses import JSONResponse
 from fitloom_avatar.engine import AvatarEngine
 from fitloom_avatar.body_prior import fuse_pare_with_prior
+from fitloom_avatar import config
 from fitloom_avatar.config import (
     ALLOWED_ORIGINS,
     AVATARS_DIR,
-    AVATAR_SERVICE_TOKEN,
 )
 
 AVATARS_ROOT = AVATARS_DIR
@@ -22,12 +22,17 @@ app = FastAPI(title="FITLOOM 3D Avatar Service", version="1.1.0")
 
 @app.middleware("http")
 async def auth_middleware(request, call_next):
-    if AVATAR_SERVICE_TOKEN and request.method != "OPTIONS" and request.url.path != "/health":
+    expected_token = (
+        getattr(config, "AVATAR_SERVICE_TOKEN", None)
+        or os.environ.get("AVATAR_SERVICE_TOKEN", "").strip()
+        or None
+    )
+    if expected_token and request.method != "OPTIONS" and request.url.path != "/health":
         auth_header = request.headers.get("authorization", "")
         if not auth_header.startswith("Bearer "):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
         token = auth_header[7:].strip()
-        if not secrets.compare_digest(token, AVATAR_SERVICE_TOKEN):
+        if not secrets.compare_digest(token, expected_token):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
     return await call_next(request)
 

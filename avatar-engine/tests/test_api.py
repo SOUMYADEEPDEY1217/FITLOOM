@@ -54,6 +54,11 @@ def test_auth_token_enforcement(client, monkeypatch):
     assert res_no_auth.status_code == 401
     assert res_no_auth.json() == {"detail": "Unauthorized"}
 
+    # Protected API asset route without token returns 401
+    res_api_no_auth = client.get("/avatars/abcd1234/apose.glb")
+    assert res_api_no_auth.status_code == 401
+    assert res_api_no_auth.json() == {"detail": "Unauthorized"}
+
     # 2. Invalid bearer token returns 401 JSON
     res_bad_auth = client.get(
         "/demo", headers={"Authorization": "Bearer invalid-wrong-token"}
@@ -61,12 +66,27 @@ def test_auth_token_enforcement(client, monkeypatch):
     assert res_bad_auth.status_code == 401
     assert res_bad_auth.json() == {"detail": "Unauthorized"}
 
+    res_api_bad_auth = client.get(
+        "/avatars/abcd1234/apose.glb",
+        headers={"Authorization": "Bearer invalid-wrong-token"},
+    )
+    assert res_api_bad_auth.status_code == 401
+    assert res_api_bad_auth.json() == {"detail": "Unauthorized"}
+
     # 3. Valid bearer token passes through middleware
     res_valid_auth = client.get(
         "/demo", headers={"Authorization": "Bearer secret-token-12345"}
     )
     # /demo is an existing static HTML file or redirect, so it returns 200
     assert res_valid_auth.status_code == 200
+
+    # Protected API asset route with valid token passes auth (returns 404 because file not found, not 401)
+    res_api_valid_auth = client.get(
+        "/avatars/abcd1234/apose.glb",
+        headers={"Authorization": "Bearer secret-token-12345"},
+    )
+    assert res_api_valid_auth.status_code == 404
+    assert res_api_valid_auth.status_code != 401
 
 
 def test_options_preflight_bypasses_auth(client, monkeypatch):
