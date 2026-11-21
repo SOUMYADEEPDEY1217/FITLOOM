@@ -14,6 +14,8 @@ import {
 import { evaluateGarmentFit } from "@/lib/fit-intelligence-utils";
 import { GarmentSize } from "@/lib/shop-utils";
 
+export const dynamic = "force-dynamic";
+
 export const POST = createApiHandler(
   async ({ user, body }) => {
     if (!user) {

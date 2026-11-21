@@ -4,6 +4,8 @@ import { db } from "@/server/db";
 import { products, garmentMeasurements } from "@/server/db/schema";
 import { ProductsQuerySchema } from "@/server/api/schemas";
 
+export const dynamic = "force-dynamic";
+
 export const GET = createApiHandler(
   async ({ req }) => {
     const searchParams = req.nextUrl.searchParams;

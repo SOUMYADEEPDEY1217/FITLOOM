@@ -3,6 +3,8 @@ import { createApiHandler, ApiError } from "@/server/api/handler";
 import { db } from "@/server/db";
 import { products, garmentMeasurements } from "@/server/db/schema";
 
+export const dynamic = "force-dynamic";
+
 export const GET = createApiHandler(
   async ({ params }) => {
     const id = params?.id;
