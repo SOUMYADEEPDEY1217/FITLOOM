@@ -4,12 +4,14 @@ import {
   EngineHealthSchema,
   EnginePresetResponseSchema,
   EngineSizingResponseSchema,
+  EngineDressResponseSchema,
   mapAppFitToEngine,
   AppFitPreference,
   GarmentType,
   EngineHealth,
   EnginePresetResponse,
   EngineSizingResponse,
+  EngineDressResponse,
 } from "./schemas";
 
 function getServiceAuthHeaders(): Record<string, string> {
@@ -199,6 +201,107 @@ export async function getGarmentSizing(params: {
       "Avatar service is temporarily unavailable"
     );
   }
+}
+
+/**
+ * Calls engine dress endpoint to generate draped garment GLB.
+ */
+export async function dressAvatar(params: {
+  avatarId: string;
+  garmentType: GarmentType | string;
+  size: string;
+  fitPreference?: AppFitPreference | string;
+  viewMode?: string;
+  colorHex?: string;
+}): Promise<EngineDressResponse> {
+  if (!/^[a-f0-9]{8}$/.test(params.avatarId)) {
+    throw new ApiError(400, "INVALID_AVATAR_ID", "Invalid avatar ID");
+  }
+
+  const url = `${env.AVATAR_SERVICE_URL}/avatars/${encodeURIComponent(
+    params.avatarId
+  )}/dress`;
+
+  try {
+    const formData = new FormData();
+    formData.append("garment_type", params.garmentType.toLowerCase());
+    formData.append("size", params.size);
+    formData.append(
+      "fit_preference",
+      mapAppFitToEngine(params.fitPreference || "regular")
+    );
+    formData.append("view_mode", params.viewMode || "fabric");
+    formData.append("color_hex", params.colorHex || "#2563eb");
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: getServiceAuthHeaders(),
+      body: formData,
+      redirect: "manual",
+      signal: AbortSignal.timeout(env.AVATAR_SERVICE_TIMEOUT_MS),
+    });
+
+    if (res.status === 404) {
+      throw new ApiError(404, "AVATAR_NOT_FOUND", "Avatar not found on engine");
+    }
+    if (res.status === 400) {
+      const errData = await res.json().catch(() => ({}));
+      throw new ApiError(
+        400,
+        "BAD_REQUEST",
+        errData.detail || "Garment dressing failed"
+      );
+    }
+    if (!res.ok) {
+      throw new ApiError(
+        503,
+        "SERVICE_UNAVAILABLE",
+        "Avatar service is temporarily unavailable"
+      );
+    }
+
+    const data = await res.json();
+    const parsed = EngineDressResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new ApiError(
+        503,
+        "SERVICE_UNAVAILABLE",
+        "Invalid response from avatar service"
+      );
+    }
+    return parsed.data;
+  } catch (err: unknown) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(
+      503,
+      "SERVICE_UNAVAILABLE",
+      "Avatar service is temporarily unavailable"
+    );
+  }
+}
+
+/**
+ * Resolves the garment asset filename from the engine glb_url.
+ * Ensures the returned filename matches ^garment_[a-z0-9_]{1,32}\.glb$.
+ */
+export function resolveGarmentAssetFile(
+  glbUrl: string,
+  garmentType: string
+): string {
+  const parts = (glbUrl || "").split("/");
+  const candidate = parts[parts.length - 1];
+  if (candidate && /^garment_[a-z0-9_]{1,32}\.glb$/.test(candidate)) {
+    return candidate;
+  }
+  const fallback = `garment_${garmentType.toLowerCase()}.glb`;
+  if (/^garment_[a-z0-9_]{1,32}\.glb$/.test(fallback)) {
+    return fallback;
+  }
+  throw new ApiError(
+    503,
+    "SERVICE_UNAVAILABLE",
+    "Invalid garment asset returned by engine"
+  );
 }
 
 /**
