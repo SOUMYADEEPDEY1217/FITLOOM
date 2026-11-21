@@ -14,7 +14,14 @@ import { Avatar3DViewer } from "@/components/avatar/Avatar3DViewer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { api, ApiError, createAvatarFromImages } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  createAvatarFromImages,
+  type PhotoBodyModelOption,
+  type PhotoClothingFitOption,
+  type PhotoBuildTypeOption,
+} from "@/lib/api";
 import {
   ProductsQuery,
   ProductItem,
@@ -118,6 +125,8 @@ export function DigitalAvatarPreview({
     isGeneratingAvatar,
     generateAvatarPreset,
     checkAvatarStatus,
+    bodyProfile,
+    hasBodyProfile,
     toast,
   } = useFitloom();
 
@@ -125,11 +134,139 @@ export function DigitalAvatarPreview({
   const effectiveAvatarId = localAvatarId || avatarId;
   const isEmpty = !hasSavedProfile && completedCount === 0 && !effectiveAvatarId;
 
+  const hasExistingProfile = hasSavedProfile || hasBodyProfile;
+  const savedProfileHeightCm = useMemo(() => {
+    if (!hasExistingProfile) return undefined;
+    const candidate = bodyProfile?.heightCm ?? metricsCm.heightCm;
+    return typeof candidate === "number" && candidate > 0 ? candidate : undefined;
+  }, [hasExistingProfile, bodyProfile?.heightCm, metricsCm.heightCm]);
+
+  const savedProfileWeightKg = useMemo(() => {
+    if (!hasExistingProfile) return undefined;
+    if (typeof bodyProfile?.weightKg === "number" && bodyProfile.weightKg > 0) {
+      return bodyProfile.weightKg;
+    }
+    if (weightKg && weightKg.trim() !== "") {
+      const parsed = Number(weightKg.trim());
+      if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return undefined;
+  }, [hasExistingProfile, bodyProfile?.weightKg, weightKg]);
+
   // Photo Upload State
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [sideFile, setSideFile] = useState<File | null>(null);
+  const [photoGender, setPhotoGender] = useState<PhotoBodyModelOption>("neutral");
+  const [photoHeightUnit, setPhotoHeightUnit] = useState<"cm" | "ft-in">("cm");
+  const [photoHeightCm, setPhotoHeightCm] = useState<string>(() =>
+    savedProfileHeightCm ? String(savedProfileHeightCm) : ""
+  );
+  const [photoHeightFt, setPhotoHeightFt] = useState<string>(() => {
+    if (!savedProfileHeightCm) return "";
+    const totalIn = savedProfileHeightCm / 2.54;
+    let ft = Math.floor(totalIn / 12);
+    const inch = Math.round((totalIn - ft * 12) * 2) / 2;
+    if (inch >= 12) ft += 1;
+    return String(ft);
+  });
+  const [photoHeightIn, setPhotoHeightIn] = useState<string>(() => {
+    if (!savedProfileHeightCm) return "";
+    const totalIn = savedProfileHeightCm / 2.54;
+    const ft = Math.floor(totalIn / 12);
+    let inch = Math.round((totalIn - ft * 12) * 2) / 2;
+    if (inch >= 12) inch = 0;
+    return String(inch);
+  });
+  const [photoWeightUnit, setPhotoWeightUnit] = useState<"kg" | "lb">("kg");
+  const [photoWeight, setPhotoWeight] = useState<string>(() =>
+    savedProfileWeightKg ? String(savedProfileWeightKg) : ""
+  );
+  const [photoClothingFit, setPhotoClothingFit] =
+    useState<PhotoClothingFitOption>("regular");
+  const [photoBuildType, setPhotoBuildType] =
+    useState<PhotoBuildTypeOption>("average");
+  const [photoHeightTouched, setPhotoHeightTouched] = useState<boolean>(false);
+  const [photoWeightTouched, setPhotoWeightTouched] = useState<boolean>(false);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState<boolean>(false);
   const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
+
+  // Sync prefilled height from saved body profile if user has not manually edited it
+  useEffect(() => {
+    if (!hasExistingProfile || photoHeightTouched) return;
+    if (typeof savedProfileHeightCm === "number" && savedProfileHeightCm > 0) {
+      setPhotoHeightCm(String(savedProfileHeightCm));
+      const totalIn = savedProfileHeightCm / 2.54;
+      let ft = Math.floor(totalIn / 12);
+      let inch = Math.round((totalIn - ft * 12) * 2) / 2;
+      if (inch >= 12) {
+        ft += 1;
+        inch = 0;
+      }
+      setPhotoHeightFt(String(ft));
+      setPhotoHeightIn(String(inch));
+    }
+  }, [hasExistingProfile, savedProfileHeightCm, photoHeightTouched]);
+
+  // Sync prefilled weight from saved body profile if user has not manually edited it
+  useEffect(() => {
+    if (!hasExistingProfile || photoWeightTouched) return;
+    if (typeof savedProfileWeightKg === "number" && savedProfileWeightKg > 0) {
+      if (photoWeightUnit === "kg") {
+        setPhotoWeight(String(savedProfileWeightKg));
+      } else {
+        const lbs = Math.round((savedProfileWeightKg / 0.45359237) * 10) / 10;
+        setPhotoWeight(String(lbs));
+      }
+    }
+  }, [hasExistingProfile, savedProfileWeightKg, photoWeightTouched, photoWeightUnit]);
+
+  function handlePhotoHeightUnitSwitch(nextUnit: "cm" | "ft-in") {
+    if (nextUnit === photoHeightUnit) return;
+    if (nextUnit === "ft-in") {
+      const trimmed = photoHeightCm.trim();
+      if (trimmed !== "" && !Number.isNaN(Number(trimmed)) && Number(trimmed) > 0) {
+        const totalIn = Number(trimmed) / 2.54;
+        let ft = Math.floor(totalIn / 12);
+        let inch = Math.round((totalIn - ft * 12) * 2) / 2;
+        if (inch >= 12) {
+          ft += 1;
+          inch = 0;
+        }
+        setPhotoHeightFt(String(ft));
+        setPhotoHeightIn(String(inch));
+      } else {
+        setPhotoHeightFt("");
+        setPhotoHeightIn("");
+      }
+    } else {
+      const ftTrim = photoHeightFt.trim();
+      const inTrim = photoHeightIn.trim();
+      if (ftTrim !== "" || inTrim !== "") {
+        const ft = Number(ftTrim) || 0;
+        const inch = Number(inTrim) || 0;
+        const cm = (ft * 12 + inch) * 2.54;
+        setPhotoHeightCm(cm > 0 ? String(Math.round(cm * 10) / 10) : "");
+      } else {
+        setPhotoHeightCm("");
+      }
+    }
+    setPhotoHeightUnit(nextUnit);
+  }
+
+  function handlePhotoWeightUnitSwitch(nextUnit: "kg" | "lb") {
+    if (nextUnit === photoWeightUnit) return;
+    const trimmed = photoWeight.trim();
+    if (trimmed !== "" && !Number.isNaN(Number(trimmed)) && Number(trimmed) > 0) {
+      if (nextUnit === "lb") {
+        const lbs = Math.round((Number(trimmed) / 0.45359237) * 10) / 10;
+        setPhotoWeight(String(lbs));
+      } else {
+        const kg = Math.round(Number(trimmed) * 0.45359237 * 10) / 10;
+        setPhotoWeight(String(kg));
+      }
+    }
+    setPhotoWeightUnit(nextUnit);
+  }
 
   const [viewMode, setViewMode] = useState<"3d" | "2d">("2d");
 
@@ -366,6 +503,29 @@ export function DigitalAvatarPreview({
       return;
     }
 
+    // Convert ft/in -> cm and lb -> kg on the client before sending
+    let resolvedHeightCm: number | undefined = undefined;
+    if (photoHeightUnit === "cm") {
+      if (photoHeightCm.trim() !== "") {
+        resolvedHeightCm = Math.round(Number(photoHeightCm.trim()) * 10) / 10;
+      }
+    } else {
+      if (photoHeightFt.trim() !== "" || photoHeightIn.trim() !== "") {
+        const ft = Number(photoHeightFt.trim()) || 0;
+        const inch = Number(photoHeightIn.trim()) || 0;
+        resolvedHeightCm = Math.round((ft * 12 + inch) * 2.54 * 10) / 10;
+      }
+    }
+
+    let resolvedWeightKg: number | undefined = undefined;
+    if (photoWeight.trim() !== "") {
+      const rawWeight = Number(photoWeight.trim());
+      resolvedWeightKg =
+        photoWeightUnit === "lb"
+          ? Math.round(rawWeight * 0.45359237 * 10) / 10
+          : Math.round(rawWeight * 10) / 10;
+    }
+
     setIsUploadingPhotos(true);
     setPhotoUploadError(null);
 
@@ -373,6 +533,11 @@ export function DigitalAvatarPreview({
       const res = await createAvatarFromImages({
         front: frontFile,
         side: sideFile,
+        gender: photoGender,
+        heightCm: resolvedHeightCm,
+        weightKg: resolvedWeightKg,
+        clothingFit: photoClothingFit,
+        buildType: photoBuildType,
       });
 
       setAvatarId(res.avatarId);
@@ -1161,6 +1326,262 @@ export function DigitalAvatarPreview({
                 disabled={isUploadingPhotos}
                 className="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[#6633EE] hover:file:bg-violet-200 focus:outline-none"
               />
+            </div>
+          </div>
+
+          {/* Optional Calibration Inputs matching Engine Demo */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-1 border-t border-slate-100">
+            {/* Body Model */}
+            <div>
+              <label
+                htmlFor="photo-body-model"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Body Model
+              </label>
+              <select
+                id="photo-body-model"
+                value={photoGender}
+                onChange={(e) =>
+                  setPhotoGender(e.target.value as PhotoBodyModelOption)
+                }
+                disabled={isUploadingPhotos}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+              >
+                <option value="neutral">Neutral</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+
+            {/* Height with cm / ft-in toggle */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor={
+                    photoHeightUnit === "cm" ? "photo-height-cm" : "photo-height-ft"
+                  }
+                  className="block text-xs font-semibold text-slate-700"
+                >
+                  Height ({photoHeightUnit === "cm" ? "cm" : "ft / in"})
+                </label>
+                <div
+                  className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-0.5 text-[10px] font-bold"
+                  role="group"
+                  aria-label="Height unit"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={photoHeightUnit === "cm"}
+                    onClick={() => handlePhotoHeightUnitSwitch("cm")}
+                    disabled={isUploadingPhotos}
+                    className={cn(
+                      "cursor-pointer rounded px-1.5 py-0.5 transition-colors",
+                      photoHeightUnit === "cm"
+                        ? "bg-[#6633EE] text-white"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    cm
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={photoHeightUnit === "ft-in"}
+                    onClick={() => handlePhotoHeightUnitSwitch("ft-in")}
+                    disabled={isUploadingPhotos}
+                    className={cn(
+                      "cursor-pointer rounded px-1.5 py-0.5 transition-colors",
+                      photoHeightUnit === "ft-in"
+                        ? "bg-[#6633EE] text-white"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    ft / in
+                  </button>
+                </div>
+              </div>
+              {photoHeightUnit === "cm" ? (
+                <div className="relative mt-1">
+                  <input
+                    id="photo-height-cm"
+                    type="number"
+                    step="0.5"
+                    min="130"
+                    max="220"
+                    placeholder="172"
+                    value={photoHeightCm}
+                    onChange={(e) => {
+                      setPhotoHeightTouched(true);
+                      setPhotoHeightCm(e.target.value);
+                      setPhotoUploadError(null);
+                    }}
+                    disabled={isUploadingPhotos}
+                    className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-2.5 pr-8 text-xs text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                  />
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">
+                    cm
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-1 grid grid-cols-2 gap-1.5">
+                  <div className="relative">
+                    <input
+                      id="photo-height-ft"
+                      type="number"
+                      step="1"
+                      min="4"
+                      max="7"
+                      placeholder="5"
+                      aria-label="Height feet"
+                      value={photoHeightFt}
+                      onChange={(e) => {
+                        setPhotoHeightTouched(true);
+                        setPhotoHeightFt(e.target.value);
+                        setPhotoUploadError(null);
+                      }}
+                      disabled={isUploadingPhotos}
+                      className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-2.5 pr-6 text-xs text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                    />
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">
+                      ft
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="photo-height-in"
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="11.5"
+                      placeholder="8"
+                      aria-label="Height inches"
+                      value={photoHeightIn}
+                      onChange={(e) => {
+                        setPhotoHeightTouched(true);
+                        setPhotoHeightIn(e.target.value);
+                        setPhotoUploadError(null);
+                      }}
+                      disabled={isUploadingPhotos}
+                      className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-2.5 pr-6 text-xs text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                    />
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">
+                      in
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Weight with kg / lb toggle */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="photo-weight"
+                  className="block text-xs font-semibold text-slate-700"
+                >
+                  Weight ({photoWeightUnit})
+                </label>
+                <div
+                  className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-0.5 text-[10px] font-bold"
+                  role="group"
+                  aria-label="Weight unit"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={photoWeightUnit === "kg"}
+                    onClick={() => handlePhotoWeightUnitSwitch("kg")}
+                    disabled={isUploadingPhotos}
+                    className={cn(
+                      "cursor-pointer rounded px-1.5 py-0.5 transition-colors",
+                      photoWeightUnit === "kg"
+                        ? "bg-[#6633EE] text-white"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    kg
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={photoWeightUnit === "lb"}
+                    onClick={() => handlePhotoWeightUnitSwitch("lb")}
+                    disabled={isUploadingPhotos}
+                    className={cn(
+                      "cursor-pointer rounded px-1.5 py-0.5 transition-colors",
+                      photoWeightUnit === "lb"
+                        ? "bg-[#6633EE] text-white"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    lb
+                  </button>
+                </div>
+              </div>
+              <div className="relative mt-1">
+                <input
+                  id="photo-weight"
+                  type="number"
+                  step="0.5"
+                  placeholder={photoWeightUnit === "kg" ? "e.g. 55" : "e.g. 121"}
+                  value={photoWeight}
+                  onChange={(e) => {
+                    setPhotoWeightTouched(true);
+                    setPhotoWeight(e.target.value);
+                    setPhotoUploadError(null);
+                  }}
+                  disabled={isUploadingPhotos}
+                  className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-2.5 pr-8 text-xs text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+                />
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">
+                  {photoWeightUnit}
+                </span>
+              </div>
+            </div>
+
+            {/* Clothing in Photo */}
+            <div>
+              <label
+                htmlFor="photo-clothing-fit"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Clothing in Photo
+              </label>
+              <select
+                id="photo-clothing-fit"
+                value={photoClothingFit}
+                onChange={(e) =>
+                  setPhotoClothingFit(e.target.value as PhotoClothingFitOption)
+                }
+                disabled={isUploadingPhotos}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+              >
+                <option value="fitted">Fitted (tight)</option>
+                <option value="regular">Regular</option>
+                <option value="loose">Loose / baggy</option>
+              </select>
+            </div>
+
+            {/* Body Build Hint */}
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="photo-build-type"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Body Build Hint
+              </label>
+              <select
+                id="photo-build-type"
+                value={photoBuildType}
+                onChange={(e) =>
+                  setPhotoBuildType(e.target.value as PhotoBuildTypeOption)
+                }
+                disabled={isUploadingPhotos}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-[#6633EE] focus:outline-none focus:ring-2 focus:ring-[#6633EE]/20"
+              >
+                <option value="slim">Slim / lean</option>
+                <option value="average">Average</option>
+                <option value="athletic">Athletic (broad chest, trim waist)</option>
+                <option value="broad">Broad / stocky</option>
+              </select>
             </div>
           </div>
 

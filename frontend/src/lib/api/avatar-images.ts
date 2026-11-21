@@ -1,9 +1,17 @@
 import { ApiError, ApiResponse } from "./types";
 
+export type PhotoBodyModelOption = "neutral" | "male" | "female";
+export type PhotoClothingFitOption = "fitted" | "regular" | "loose";
+export type PhotoBuildTypeOption = "slim" | "average" | "athletic" | "broad";
+
 export interface CreateAvatarFromImagesOptions {
   front: File | Blob;
   side?: File | Blob | null;
-  gender?: "neutral" | "male" | "female" | string;
+  gender?: PhotoBodyModelOption | string;
+  heightCm?: number | null;
+  weightKg?: number | null;
+  clothingFit?: PhotoClothingFitOption | string;
+  buildType?: PhotoBuildTypeOption | string;
 }
 
 export interface AvatarFromImagesResponse {
@@ -31,6 +39,18 @@ export async function createAvatarFromImages(
   }
   if (options.gender) {
     formData.append("gender", options.gender);
+  }
+  if (options.heightCm != null && !Number.isNaN(options.heightCm)) {
+    formData.append("height_cm", String(options.heightCm));
+  }
+  if (options.weightKg != null && !Number.isNaN(options.weightKg)) {
+    formData.append("weight_kg", String(options.weightKg));
+  }
+  if (options.clothingFit) {
+    formData.append("clothing_fit", options.clothingFit);
+  }
+  if (options.buildType) {
+    formData.append("build_type", options.buildType);
   }
 
   const response = await fetch("/api/avatar/from-images", {

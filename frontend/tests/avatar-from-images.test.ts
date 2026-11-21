@@ -233,32 +233,108 @@ describe("POST /api/avatar/from-images", () => {
     expect(json.error.message).toBe("Could not read a body in this photo, try again");
   });
 
-  it("7. returns 201 with avatar details and saves ownership on valid upload", async () => {
+  it("7. succeeds with only front photo and forwards engine defaults", async () => {
     mockSession(TEST_USER);
 
-    // Mock successful engine response
     const mockEngineResponse = {
       avatar_id: "img-avatar-12345",
       measurements: {
-        height_cm: 178,
-        chest_circ: 98,
-        waist_circ: 82,
+        height_cm: 170,
+        chest_cm: 94,
+        waist_cm: 78,
       },
       calibration: {
-        confidence: 0.95,
+        applied: false,
       },
       assets: {
-        apose_glb: "assets/img-avatar-12345/apose.glb",
-        tpose_glb: "assets/img-avatar-12345/tpose.glb",
-        measurements_json: "assets/img-avatar-12345/measurements.json",
+        apose_glb: "/avatars/img-avatar-12345/apose.glb",
+        tpose_glb: "/avatars/img-avatar-12345/tpose.glb",
+        measurements_json: "/avatars/img-avatar-12345/measurements.json",
       },
     };
 
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => mockEngineResponse,
-    } as any);
+    vi.mocked(global.fetch).mockImplementationOnce(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        const forwardedForm = init?.body as FormData;
+        expect(forwardedForm.get("front")).toBeTruthy();
+        expect(forwardedForm.get("side")).toBeNull();
+        expect(forwardedForm.get("gender")).toBe("neutral");
+        expect(forwardedForm.get("clothing_fit")).toBe("regular");
+        expect(forwardedForm.get("build_type")).toBe("average");
+        expect(forwardedForm.get("height_cm")).toBeNull();
+        expect(forwardedForm.get("weight_kg")).toBeNull();
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockEngineResponse,
+        } as any;
+      }
+    );
+
+    const formData = new FormData();
+    const frontFile = new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", {
+      type: "image/jpeg",
+    });
+    formData.append("front", frontFile);
+
+    const req = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3000",
+      },
+      body: formData,
+    });
+
+    const res = await postAvatarFromImages(req);
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(json.data.avatarId).toBe("img-avatar-12345");
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it("8. succeeds with valid full form and forwards exact api.py field names to engine", async () => {
+    mockSession(TEST_USER);
+
+    const mockEngineResponse = {
+      avatar_id: "img-avatar-12345",
+      measurements: {
+        height_cm: 178.5,
+        chest_cm: 101,
+        waist_cm: 82,
+      },
+      calibration: {
+        applied: true,
+        weight_kg: 74.2,
+        clothing_fit: "fitted",
+        build_type: "athletic",
+      },
+      assets: {
+        apose_glb: "/avatars/img-avatar-12345/apose.glb",
+        tpose_glb: "/avatars/img-avatar-12345/tpose.glb",
+        measurements_json: "/avatars/img-avatar-12345/measurements.json",
+      },
+    };
+
+    vi.mocked(global.fetch).mockImplementationOnce(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        const forwardedForm = init?.body as FormData;
+        expect(forwardedForm.get("front")).toBeTruthy();
+        expect(forwardedForm.get("side")).toBeTruthy();
+        expect(forwardedForm.get("gender")).toBe("male");
+        expect(forwardedForm.get("height_cm")).toBe("178.5");
+        expect(forwardedForm.get("weight_kg")).toBe("74.2");
+        expect(forwardedForm.get("clothing_fit")).toBe("fitted");
+        expect(forwardedForm.get("build_type")).toBe("athletic");
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockEngineResponse,
+        } as any;
+      }
+    );
 
     const formData = new FormData();
     const frontFile = new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", {
@@ -269,6 +345,11 @@ describe("POST /api/avatar/from-images", () => {
     });
     formData.append("front", frontFile);
     formData.append("side", sideFile);
+    formData.append("gender", "male");
+    formData.append("height_cm", "178.5");
+    formData.append("weight_kg", "74.2");
+    formData.append("clothing_fit", "fitted");
+    formData.append("build_type", "athletic");
 
     const req = new NextRequest("http://localhost:3000/api/avatar/from-images", {
       method: "POST",
@@ -288,8 +369,114 @@ describe("POST /api/avatar/from-images", () => {
     expect(json.data.assets.measurements).toBe(
       "/api/avatar/assets/img-avatar-12345/measurements.json"
     );
-
-    // Verify DB insert called to record ownership
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it("9. returns 400 VALIDATION_ERROR on invalid height (< 130 cm or > 220 cm)", async () => {
+    // Too short (< 130)
+    mockSession(TEST_USER);
+    const fdShort = new FormData();
+    fdShort.append(
+      "front",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", { type: "image/jpeg" })
+    );
+    fdShort.append("height_cm", "120");
+
+    const reqShort = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000" },
+      body: fdShort,
+    });
+    const resShort = await postAvatarFromImages(reqShort);
+    expect(resShort.status).toBe(400);
+    const jsonShort = await resShort.json();
+    expect(jsonShort.ok).toBe(false);
+    expect(jsonShort.error.code).toBe("VALIDATION_ERROR");
+    expect(jsonShort.error.fieldErrors?.height_cm).toBeDefined();
+
+    // Too tall (> 220)
+    mockSession(TEST_USER);
+    const fdTall = new FormData();
+    fdTall.append(
+      "front",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", { type: "image/jpeg" })
+    );
+    fdTall.append("height_cm", "235");
+
+    const reqTall = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000" },
+      body: fdTall,
+    });
+    const resTall = await postAvatarFromImages(reqTall);
+    expect(resTall.status).toBe(400);
+    const jsonTall = await resTall.json();
+    expect(jsonTall.ok).toBe(false);
+    expect(jsonTall.error.code).toBe("VALIDATION_ERROR");
+    expect(jsonTall.error.fieldErrors?.height_cm).toBeDefined();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("10. returns 400 VALIDATION_ERROR on invalid enum values or unknown strict fields", async () => {
+    // Invalid gender enum
+    mockSession(TEST_USER);
+    const fdGender = new FormData();
+    fdGender.append(
+      "front",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", { type: "image/jpeg" })
+    );
+    fdGender.append("gender", "cyborg");
+
+    const reqGender = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000" },
+      body: fdGender,
+    });
+    const resGender = await postAvatarFromImages(reqGender);
+    expect(resGender.status).toBe(400);
+    const jsonGender = await resGender.json();
+    expect(jsonGender.ok).toBe(false);
+    expect(jsonGender.error.code).toBe("VALIDATION_ERROR");
+
+    // Invalid clothing_fit enum
+    mockSession(TEST_USER);
+    const fdClothing = new FormData();
+    fdClothing.append(
+      "front",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", { type: "image/jpeg" })
+    );
+    fdClothing.append("clothing_fit", "oversized_coat");
+
+    const reqClothing = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000" },
+      body: fdClothing,
+    });
+    const resClothing = await postAvatarFromImages(reqClothing);
+    expect(resClothing.status).toBe(400);
+    const jsonClothing = await resClothing.json();
+    expect(jsonClothing.ok).toBe(false);
+    expect(jsonClothing.error.code).toBe("VALIDATION_ERROR");
+
+    // Invalid build_type enum
+    mockSession(TEST_USER);
+    const fdBuild = new FormData();
+    fdBuild.append(
+      "front",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", { type: "image/jpeg" })
+    );
+    fdBuild.append("build_type", "superhero");
+
+    const reqBuild = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000" },
+      body: fdBuild,
+    });
+    const resBuild = await postAvatarFromImages(reqBuild);
+    expect(resBuild.status).toBe(400);
+    const jsonBuild = await resBuild.json();
+    expect(jsonBuild.ok).toBe(false);
+    expect(jsonBuild.error.code).toBe("VALIDATION_ERROR");
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

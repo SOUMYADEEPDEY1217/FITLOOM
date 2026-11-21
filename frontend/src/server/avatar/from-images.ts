@@ -2,6 +2,66 @@ import { z } from "zod";
 import { env } from "@/server/env";
 import { ApiError } from "@/server/api/handler";
 
+export const PhotoGenderSchema = z.enum(["neutral", "male", "female"]);
+export type PhotoGender = z.infer<typeof PhotoGenderSchema>;
+
+export const PhotoClothingFitSchema = z.enum(["fitted", "regular", "loose"]);
+export type PhotoClothingFit = z.infer<typeof PhotoClothingFitSchema>;
+
+export const PhotoBuildTypeSchema = z.enum(["slim", "average", "athletic", "broad"]);
+export type PhotoBuildType = z.infer<typeof PhotoBuildTypeSchema>;
+
+export const AvatarFromImagesFormSchema = z
+  .object({
+    gender: PhotoGenderSchema.optional().default("neutral"),
+    height_cm: z
+      .number({ invalid_type_error: "Height must be a valid number" })
+      .finite("Height must be a finite number")
+      .min(130, "Height must be between 130 and 220 cm")
+      .max(220, "Height must be between 130 and 220 cm")
+      .optional(),
+    weight_kg: z
+      .number({ invalid_type_error: "Weight must be a valid number" })
+      .finite("Weight must be a finite number")
+      .min(30, "Weight must be between 30 and 250 kg")
+      .max(250, "Weight must be between 30 and 250 kg")
+      .optional(),
+    clothing_fit: PhotoClothingFitSchema.optional().default("regular"),
+    build_type: PhotoBuildTypeSchema.optional().default("average"),
+  })
+  .strict();
+
+export type AvatarFromImagesFormInput = z.infer<typeof AvatarFromImagesFormSchema>;
+
+const FORM_KEY_ALIASES: Record<string, string> = {
+  heightCm: "height_cm",
+  weightKg: "weight_kg",
+  clothingFit: "clothing_fit",
+  buildType: "build_type",
+};
+
+export function extractFormFieldsFromFormData(
+  formData: FormData
+): Record<string, unknown> {
+  const raw: Record<string, unknown> = {};
+  for (const [entryKey, entryVal] of formData.entries()) {
+    if (entryKey === "front" || entryKey === "side") continue;
+    const key = FORM_KEY_ALIASES[entryKey] ?? entryKey;
+    if (typeof entryVal !== "string") {
+      raw[key] = entryVal;
+      continue;
+    }
+    const trimmed = entryVal.trim();
+    if (trimmed === "") continue;
+    if (key === "height_cm" || key === "weight_kg") {
+      raw[key] = Number(trimmed);
+    } else {
+      raw[key] = trimmed;
+    }
+  }
+  return raw;
+}
+
 export const EngineFromImagesResponseSchema = z.object({
   avatar_id: z.string(),
   measurements: z.record(z.unknown()),

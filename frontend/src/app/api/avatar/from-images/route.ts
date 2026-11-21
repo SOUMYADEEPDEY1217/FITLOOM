@@ -2,7 +2,11 @@ import { eq } from "drizzle-orm";
 import { createApiHandler, ApiError } from "@/server/api/handler";
 import { db } from "@/server/db";
 import { bodyProfiles, avatars } from "@/server/db/schema";
-import { createAvatarFromImages } from "@/server/avatar";
+import {
+  createAvatarFromImages,
+  AvatarFromImagesFormSchema,
+  extractFormFieldsFromFormData,
+} from "@/server/avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +90,24 @@ export const POST = createApiHandler(
       sideFile = candidate;
     }
 
-    // 3. Resolve user profile for sizing context if available
+    // 3. Validate optional form parameters with strict Zod schema
+    const rawFormFields = extractFormFieldsFromFormData(formData);
+    const parsedFormResult = AvatarFromImagesFormSchema.safeParse(rawFormFields);
+    if (!parsedFormResult.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of parsedFormResult.error.issues) {
+        const key = issue.path.join(".") || "form";
+        if (!fieldErrors[key]) {
+          fieldErrors[key] = issue.message;
+        }
+      }
+      const firstIssue = parsedFormResult.error.issues[0]?.message || "Invalid form parameters";
+      throw new ApiError(400, "VALIDATION_ERROR", firstIssue, fieldErrors);
+    }
+
+    const parsedForm = parsedFormResult.data;
+
+    // 4. Resolve user profile for fallback sizing context if height/weight not explicitly sent
     const profiles = await db
       .select()
       .from(bodyProfiles)
@@ -94,23 +115,42 @@ export const POST = createApiHandler(
       .limit(1);
 
     const profile = profiles[0];
-    const heightCm = profile?.heightCm ? Number(profile.heightCm) : undefined;
-    const weightKg = profile?.weightKg ? Number(profile.weightKg) : undefined;
-    const genderForm = formData.get("gender");
-    const gender = typeof genderForm === "string" && ["neutral", "male", "female"].includes(genderForm)
-      ? genderForm
-      : "neutral";
+    const profileHeight = profile?.heightCm ? Number(profile.heightCm) : undefined;
+    const profileWeight = profile?.weightKg ? Number(profile.weightKg) : undefined;
 
-    // 4. Forward to avatar engine (photos are streamed in-memory, never stored or logged)
+    const validProfileHeight =
+      profileHeight !== undefined &&
+      !Number.isNaN(profileHeight) &&
+      profileHeight >= 130 &&
+      profileHeight <= 220
+        ? profileHeight
+        : undefined;
+    const validProfileWeight =
+      profileWeight !== undefined &&
+      !Number.isNaN(profileWeight) &&
+      profileWeight >= 30 &&
+      profileWeight <= 250
+        ? profileWeight
+        : undefined;
+
+    const heightCm = parsedForm.height_cm ?? validProfileHeight;
+    const weightKg = parsedForm.weight_kg ?? validProfileWeight;
+    const gender = parsedForm.gender;
+    const clothingFit = parsedForm.clothing_fit;
+    const buildType = parsedForm.build_type;
+
+    // 5. Forward to avatar engine (photos are streamed in-memory, never stored or logged)
     const engineResult = await createAvatarFromImages({
       front: frontFile,
       side: sideFile,
       gender,
       heightCm,
       weightKg,
+      clothingFit,
+      buildType,
     });
 
-    // 5. Save ownership in avatars table exactly like preset flow
+    // 6. Save ownership in avatars table exactly like preset flow
     const [inserted] = await db
       .insert(avatars)
       .values({
@@ -119,6 +159,8 @@ export const POST = createApiHandler(
         metadata: {
           measurements: engineResult.measurements,
           gender,
+          clothingFit,
+          buildType,
           source: "photos",
           calibration: engineResult.calibration,
           createdAt: new Date().toISOString(),
