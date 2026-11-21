@@ -36,7 +36,9 @@ export const auth = betterAuth({
       generateId: "uuid",
     },
     cookiePrefix: "fitloom",
-    useSecureCookies: process.env.NODE_ENV === "production",
+    useSecureCookies:
+      process.env.NODE_ENV === "production" ||
+      (process.env.BETTER_AUTH_URL || "").startsWith("https"),
   },
   rateLimit: {
     enabled: true,
