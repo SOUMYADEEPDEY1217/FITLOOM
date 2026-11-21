@@ -22,6 +22,8 @@ AVATARS_DIR = os.environ.get(
 
 AVATAR_SERVICE_TOKEN = os.environ.get("AVATAR_SERVICE_TOKEN", "").strip() or None
 
+FITLOOM_REQUIRE_TOKEN = os.environ.get("FITLOOM_REQUIRE_TOKEN", "0").strip()
+
 _allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
 ALLOWED_ORIGINS = [
     origin.strip()

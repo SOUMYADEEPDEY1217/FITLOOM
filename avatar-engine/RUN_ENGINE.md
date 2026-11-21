@@ -58,11 +58,14 @@ All filesystem paths and service security settings are configurable via environm
 | `FITLOOM_MODEL_PATH` | `<avatar-engine>/data/body_models_300` | Directory containing SMPL 300-shape `.pkl` model definitions. |
 | `FITLOOM_AVATARS_DIR` | `<avatar-engine>/outputs/api_avatars` | Filesystem directory where generated avatar bundles (`avatar_apose.glb`, `avatar_tpose.glb`, `measurements.json`) are stored. |
 | `AVATAR_SERVICE_TOKEN` | *None* (optional) | Shared secret bearer token. When set, all HTTP endpoints except `/health` and `OPTIONS` require header `Authorization: Bearer <token>`. Missing or invalid tokens return `401 Unauthorized` JSON. |
+| `FITLOOM_REQUIRE_TOKEN` | `0` | Fail-closed security gate: set to 1 in any deployed environment. If 1 and `AVATAR_SERVICE_TOKEN` is empty, raises `RuntimeError` at startup. |
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated list of allowed CORS origins (e.g., `http://localhost:3000,https://fitloom.com`). |
 
 ---
 
 ## 4. API Endpoints Overview
+
+> **Note:** `/demo` needs no token set, local only.
 
 - `GET /health` - Service status and model readiness (unauthenticated, CORS enabled).
 - `POST /avatars/from-images` - Upload front (and optional side) photos to reconstruct 3D mesh and body measurements.

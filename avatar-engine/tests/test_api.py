@@ -123,3 +123,18 @@ def test_path_traversal_and_safe_asset(client, monkeypatch):
     res_not_found = client.get("/avatars/a1b2c3d4/apose.glb")
     assert res_not_found.status_code == 404
     assert "Asset not found" in res_not_found.json().get("detail", "")
+
+
+def test_startup_fails_closed_when_require_token_is_one_and_token_empty(monkeypatch):
+    from fitloom_avatar.api import _startup
+
+    monkeypatch.setattr(config, "FITLOOM_REQUIRE_TOKEN", "1")
+    monkeypatch.setattr(config, "AVATAR_SERVICE_TOKEN", None)
+
+    with pytest.raises(RuntimeError, match="FITLOOM_REQUIRE_TOKEN=1 is set, but AVATAR_SERVICE_TOKEN is empty"):
+        _startup()
+
+    # When token is provided, startup does not raise
+    monkeypatch.setattr(config, "AVATAR_SERVICE_TOKEN", "valid-token-present")
+    _startup()
+

@@ -36,3 +36,10 @@ def test_avatar_service_token_env(monkeypatch):
     monkeypatch.setenv("AVATAR_SERVICE_TOKEN", "   ")
     token_empty = os.environ.get("AVATAR_SERVICE_TOKEN", "").strip() or None
     assert token_empty is None
+
+
+def test_fitloom_require_token_env(monkeypatch):
+    assert config.FITLOOM_REQUIRE_TOKEN == "0"
+    monkeypatch.setenv("FITLOOM_REQUIRE_TOKEN", "1")
+    req = os.environ.get("FITLOOM_REQUIRE_TOKEN", "0").strip()
+    assert req == "1"

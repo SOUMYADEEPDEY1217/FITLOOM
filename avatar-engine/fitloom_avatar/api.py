@@ -22,17 +22,13 @@ app = FastAPI(title="FITLOOM 3D Avatar Service", version="1.1.0")
 
 @app.middleware("http")
 async def auth_middleware(request, call_next):
-    expected_token = (
-        getattr(config, "AVATAR_SERVICE_TOKEN", None)
-        or os.environ.get("AVATAR_SERVICE_TOKEN", "").strip()
-        or None
-    )
-    if expected_token and request.method != "OPTIONS" and request.url.path != "/health":
+    token = config.AVATAR_SERVICE_TOKEN
+    if token and request.method != "OPTIONS" and request.url.path != "/health":
         auth_header = request.headers.get("authorization", "")
         if not auth_header.startswith("Bearer "):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
-        token = auth_header[7:].strip()
-        if not secrets.compare_digest(token, expected_token):
+        provided = auth_header[7:].strip()
+        if not secrets.compare_digest(provided, token):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
     return await call_next(request)
 
@@ -49,6 +45,12 @@ engine = AvatarEngine()
 
 @app.on_event("startup")
 def _startup():
+    require_token = str(getattr(config, "FITLOOM_REQUIRE_TOKEN", "0")).strip()
+    token = getattr(config, "AVATAR_SERVICE_TOKEN", None)
+    if require_token == "1" and not token:
+        raise RuntimeError(
+            "FITLOOM_REQUIRE_TOKEN=1 is set, but AVATAR_SERVICE_TOKEN is empty. Failing closed."
+        )
     engine.warmup()
 
 
