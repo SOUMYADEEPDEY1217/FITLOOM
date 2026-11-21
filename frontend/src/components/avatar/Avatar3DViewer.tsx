@@ -124,6 +124,7 @@ export function Avatar3DViewer({
       renderer.dispose();
       sceneRef.current = null;
       currentModelRef.current = null;
+      currentGarmentRef.current = null;
       controlsRef.current = null;
       cameraRef.current = null;
     };
@@ -205,33 +206,45 @@ export function Avatar3DViewer({
 
     let isMounted = true;
 
-    // Remove previous garment
-    if (currentGarmentRef.current) {
-      scene.remove(currentGarmentRef.current);
-      // Dispose geometries and materials
-      currentGarmentRef.current.traverse((child) => {
+    // Helper to safely dispose a garment group
+    const disposeGarment = (targetScene: THREE.Scene | null, garment: THREE.Group | null) => {
+      if (!garment) return;
+      if (targetScene) targetScene.remove(garment);
+      garment.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
           if (mesh.geometry) mesh.geometry.dispose();
           if (mesh.material) {
-            if (Array.isArray(mesh.material)) {
-              mesh.material.forEach((m) => m.dispose());
-            } else {
-              mesh.material.dispose();
-            }
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            materials.forEach((m) => m.dispose());
           }
         }
       });
+    };
+
+    // Remove and dispose previous garment whenever URL changes or becomes undefined
+    if (currentGarmentRef.current) {
+      disposeGarment(scene, currentGarmentRef.current);
       currentGarmentRef.current = null;
     }
 
     if (!garmentUrl) return;
 
+    const cacheBuster = Date.now();
+    const loadUrl = garmentUrl.includes("?v=") || garmentUrl.includes("&v=")
+      ? garmentUrl
+      : garmentUrl.includes("?")
+      ? `${garmentUrl}&v=${cacheBuster}`
+      : `${garmentUrl}?v=${cacheBuster}`;
+
     const loader = new GLTFLoader();
     loader.load(
-      garmentUrl,
+      loadUrl,
       (gltf) => {
-        if (!isMounted) return;
+        if (!isMounted) {
+          disposeGarment(scene, gltf.scene);
+          return;
+        }
 
         const garment = gltf.scene;
         garment.traverse((child) => {
@@ -241,19 +254,14 @@ export function Avatar3DViewer({
             mesh.receiveShadow = true;
             // Use double-sided material for garment
             if (mesh.material) {
-              if (Array.isArray(mesh.material)) {
-                mesh.material.forEach((mat) => {
-                  if (mat instanceof THREE.MeshStandardMaterial) {
-                    mat.side = THREE.DoubleSide;
-                    mat.roughness = 0.5;
-                    mat.metalness = 0.1;
-                  }
-                });
-              } else if (mesh.material instanceof THREE.MeshStandardMaterial) {
-                mesh.material.side = THREE.DoubleSide;
-                mesh.material.roughness = 0.5;
-                mesh.material.metalness = 0.1;
-              }
+              const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              materials.forEach((mat) => {
+                mat.side = THREE.DoubleSide;
+                if (mat instanceof THREE.MeshStandardMaterial) {
+                  mat.roughness = 0.5;
+                  mat.metalness = 0.1;
+                }
+              });
             }
           }
         });
@@ -272,6 +280,10 @@ export function Avatar3DViewer({
 
     return () => {
       isMounted = false;
+      if (currentGarmentRef.current) {
+        disposeGarment(scene, currentGarmentRef.current);
+        currentGarmentRef.current = null;
+      }
     };
   }, [garmentUrl]);
 

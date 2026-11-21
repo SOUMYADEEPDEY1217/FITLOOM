@@ -95,3 +95,43 @@ export const EngineSizingResponseSchema = z.object({
 });
 
 export type EngineSizingResponse = z.infer<typeof EngineSizingResponseSchema>;
+
+export const AvatarDressSizeSchema = z.enum(["XS", "S", "M", "L", "XL", "XXL"]);
+export type AvatarDressSize = z.infer<typeof AvatarDressSizeSchema>;
+
+export const AvatarDressInputSchema = z
+  .object({
+    avatarId: z
+      .string()
+      .regex(/^[a-f0-9]{8}$/, "Invalid avatarId format"),
+    garmentType: GarmentTypeSchema,
+    size: AvatarDressSizeSchema,
+    fitPreference: AppFitPreferenceSchema.optional(),
+  })
+  .strict();
+
+export type AvatarDressInput = z.infer<typeof AvatarDressInputSchema>;
+
+export const EngineDressResponseSchema = z.object({
+  avatar_id: z.string().regex(/^[a-f0-9]{8}$/),
+  garment_type: z.string(),
+  slot: z.string(),
+  glb_url: z.string(),
+  selected: z.record(z.string(), z.unknown()).optional(),
+  sizing: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type EngineDressResponse = z.infer<typeof EngineDressResponseSchema>;
+
+export const AvatarDressResultSchema = z.object({
+  mode: z.literal("live_avatar_engine"),
+  garment: z.object({
+    type: GarmentTypeSchema,
+    size: AvatarDressSizeSchema,
+    fitPreference: AppFitPreferenceSchema,
+    url: z.string(),
+  }),
+});
+
+export type AvatarDressResult = z.infer<typeof AvatarDressResultSchema>;
+

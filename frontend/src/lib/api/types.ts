@@ -134,6 +134,30 @@ export interface AvatarPresetResponse {
   createdAt: string;
 }
 
+// Avatar Dress API Types
+export type GarmentTypeOption = "tshirt" | "shirt" | "trousers" | "kurti";
+
+export type FitPreferenceAvatarOption = "slim" | "regular" | "relaxed" | "oversized";
+
+export interface AvatarDressInput {
+  avatarId: string;
+  garmentType: GarmentTypeOption;
+  size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  fitPreference?: FitPreferenceAvatarOption;
+}
+
+export interface AvatarDressGarment {
+  type: GarmentTypeOption;
+  size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  fitPreference?: FitPreferenceAvatarOption;
+  url: string;
+}
+
+export interface AvatarDressResponse {
+  mode: "live_avatar_engine" | "fallback_demo";
+  garment: AvatarDressGarment;
+}
+
 // ==========================================
 // Catalogue & Products API Types
 // ==========================================
@@ -199,29 +223,6 @@ export interface ProductResponse {
 }
 
 // ==========================================
-// Avatar Dress API Types
-// ==========================================
-
-export interface AvatarDressInput {
-  avatarId: string;
-  garmentType: "tshirt" | "shirt" | "trousers" | "kurti";
-  size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
-  fitPreference?: "slim" | "regular" | "relaxed" | "oversized";
-}
-
-export interface AvatarDressGarment {
-  type: string;
-  size: string;
-  fitPreference?: string;
-  url: string;
-}
-
-export interface AvatarDressResponse {
-  mode: "live_ai" | "fallback_demo";
-  garment: AvatarDressGarment;
-}
-
-// ==========================================
 // Fit-Check API Types
 // ==========================================
 
@@ -261,6 +262,7 @@ export interface FitCheckComparison {
   verdictLabel: string;
   badgeVariant: string;
   explanation: string;
+  evidenceSummary: string;
 }
 
 export interface FitCheckResponse {
@@ -283,4 +285,3 @@ export interface FitCheckResponse {
   escalateToCustomFit: boolean;
   escalationReason: string | null;
 }
-

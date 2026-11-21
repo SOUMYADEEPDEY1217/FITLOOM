@@ -51,7 +51,15 @@ import {
   AvatarDressResponse,
   ProductsQuery,
   ProductItem,
+  GarmentTypeOption,
+  FitPreferenceAvatarOption,
 } from "@/lib/api/types";
+import {
+  GARMENT_TYPE_OPTIONS,
+  SIZE_OPTIONS,
+  FIT_PREFERENCE_OPTIONS,
+  type AvatarGarmentSize,
+} from "@/lib/garments";
 
 type StudioBackdrop = "violet" | "light" | "slate";
 
@@ -165,36 +173,7 @@ function StudioQuerySync({
   return null;
 }
 
-const GARMENT_TYPE_OPTIONS: ReadonlyArray<{
-  value: GarmentType;
-  label: string;
-  category: string;
-}> = [
-  { value: "tshirt", label: "T-Shirt", category: "T-Shirts" },
-  { value: "shirt", label: "Shirt", category: "Shirts" },
-  { value: "trousers", label: "Trousers", category: "Trousers" },
-  { value: "kurti", label: "Kurti", category: "Kurtis" },
-];
 
-const SIZE_OPTIONS: ReadonlyArray<"XS" | "S" | "M" | "L" | "XL" | "XXL"> = [
-  "XS",
-  "S",
-  "M",
-  "L",
-  "XL",
-  "XXL",
-];
-
-const FIT_PREFERENCE_OPTIONS: ReadonlyArray<{
-  value: "slim" | "regular" | "relaxed" | "oversized";
-  label: string;
-  easeCm: number;
-}> = [
-  { value: "slim", label: "Slim", easeCm: 5 },
-  { value: "regular", label: "Regular", easeCm: 8 },
-  { value: "relaxed", label: "Relaxed", easeCm: 12 },
-  { value: "oversized", label: "Oversized", easeCm: 15 },
-];
 
 export default function StyleStudioPage() {
   const router = useRouter();
@@ -285,12 +264,12 @@ export default function StyleStudioPage() {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
   // Garment Panel State
-  const [garmentPanelGarmentType, setGarmentPanelGarmentType] = useState<GarmentType>("shirt");
+  const [garmentPanelGarmentType, setGarmentPanelGarmentType] = useState<GarmentTypeOption>("shirt");
   const [garmentPanelCatalogue, setGarmentPanelCatalogue] = useState<ProductItem[]>([]);
   const [garmentPanelSelectedProductId, setGarmentPanelSelectedProductId] = useState<string | null>(null);
-  const [garmentPanelSelectedSize, setGarmentPanelSelectedSize] = useState<"XS" | "S" | "M" | "L" | "XL" | "XXL">("M");
-  const [garmentPanelFitPreference, setGarmentPanelFitPreference] = useState<"slim" | "regular" | "relaxed" | "oversized">("regular");
-  const [garmentPanelRecommendedSize, setGarmentPanelRecommendedSize] = useState<"XS" | "S" | "M" | "L" | "XL" | "XXL" | null>(null);
+  const [garmentPanelSelectedSize, setGarmentPanelSelectedSize] = useState<AvatarGarmentSize>("M");
+  const [garmentPanelFitPreference, setGarmentPanelFitPreference] = useState<FitPreferenceAvatarOption>("regular");
+  const [garmentPanelRecommendedSize, setGarmentPanelRecommendedSize] = useState<AvatarGarmentSize | null>(null);
   const [garmentPanelLoading, setGarmentPanelLoading] = useState(false);
   const [garmentPanelError, setGarmentPanelError] = useState<string | null>(null);
   const [garmentPanelDressedUrl, setGarmentPanelDressedUrl] = useState<string | null>(null);
@@ -488,11 +467,13 @@ export default function StyleStudioPage() {
       .then((res) => {
         if (!cancelled && res.recommendedSize) {
           // Map S/M/L/XL to XS/S/M/L/XL/XXL
-          const sizeMap: Record<string, "XS" | "S" | "M" | "L" | "XL" | "XXL"> = {
+          const sizeMap: Record<string, AvatarGarmentSize> = {
+            XS: "XS",
             S: "S",
             M: "M",
             L: "L",
             XL: "XL",
+            XXL: "XXL",
           };
           setGarmentPanelRecommendedSize(sizeMap[res.recommendedSize] ?? "M");
         } else if (!cancelled) {
@@ -513,7 +494,7 @@ export default function StyleStudioPage() {
     if (!avatarId) {
       toast({
         type: "warning",
-        title: "Create Your Avatar First",
+        title: "Create your avatar first",
         message: "Generate a 3D avatar from your Body Profile before dressing it.",
       });
       return;
@@ -521,7 +502,7 @@ export default function StyleStudioPage() {
     if (avatarServiceOffline) {
       toast({
         type: "error",
-        title: "Avatar Service Offline",
+        title: "Avatar service offline",
         message: "The 3D avatar engine is temporarily unavailable. Please try again later.",
       });
       return;
@@ -547,11 +528,15 @@ export default function StyleStudioPage() {
 
     try {
       const res: AvatarDressResponse = await api.dressAvatar(input);
-      setGarmentPanelDressedUrl(res.garment.url);
+      const cacheBuster = Date.now();
+      const dressedUrl = res.garment.url.includes("?")
+        ? `${res.garment.url}&v=${cacheBuster}`
+        : `${res.garment.url}?v=${cacheBuster}`;
+      setGarmentPanelDressedUrl(dressedUrl);
       toast({
         type: "success",
         title: "Avatar Dressed",
-        message: `Garment applied in ${res.mode === "live_ai" ? "live AI" : "fallback demo"} mode.`,
+        message: `Garment applied in ${res.mode === "live_avatar_engine" ? "live avatar engine" : "fallback demo"} mode.`,
       });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -1344,8 +1329,15 @@ export default function StyleStudioPage() {
                       )}
                     >
                       {sz}
-                      {garmentPanelRecommendedSize === sz && garmentPanelSelectedSize !== sz && (
-                        <span className="ml-1 text-[10px] font-normal">Best</span>
+                      {garmentPanelRecommendedSize === sz && (
+                        <span
+                          className={cn(
+                            "ml-1 text-[10px] font-normal",
+                            garmentPanelSelectedSize === sz ? "text-violet-200" : "text-emerald-700 font-semibold"
+                          )}
+                        >
+                          Best
+                        </span>
                       )}
                     </button>
                   ))}
