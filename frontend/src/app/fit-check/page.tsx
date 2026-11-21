@@ -32,7 +32,6 @@ import {
   api,
   ApiError,
   type FitCheckResponse,
-  type ProductItem,
 } from "@/lib/api";
 import {
   FitPreference,
