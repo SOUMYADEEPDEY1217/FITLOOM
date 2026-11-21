@@ -386,6 +386,7 @@ export async function seed() {
       .onConflictDoUpdate({
         target: products.id,
         set: {
+          sellerPartnerId: PARTNER_VERVE_ID,
           name: g.name,
           description: g.description,
           garmentType,

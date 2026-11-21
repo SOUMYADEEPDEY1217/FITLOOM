@@ -131,6 +131,12 @@ All Route Handlers adhere to the uniform `{ ok: false, error: { code, message, f
 | :--- | :--- | :--- |
 | **`400`** | `VALIDATION_ERROR` | Request failed Zod schema parsing; includes `fieldErrors` map. |
 | **`400`** | `BAD_REQUEST` | Malformed JSON body or invalid syntax. |
+| **`400`** | `CART_INVALID` | Cart is empty, contains inactive items, or items missing seller partners during checkout. |
+| **`400`** | `SIZE_UNAVAILABLE` | Selected size is not available in garment measurements for this product. |
+| **`400`** | `PRODUCT_UNAVAILABLE` | Product is not active or approved for customer purchase. |
+| **`400`** | `CANNOT_CANCEL_ORDER` | Order is in a stage that does not permit customer cancellation (e.g. stitching, delivered). |
+| **`400`** | `ORDER_ALREADY_CANCELLED` | Order has already been cancelled. |
+| **`400`** | `CANNOT_RETURN_ORDER` | Return requested on an order that has not reached Delivered stage. |
 | **`400`** | `INVALID_AVATAR_ID` | Avatar ID fails 8-char hex format validation (`^[a-f0-9]{8}$`). |
 | **`400`** | `DISALLOWED_FILE` | Requested asset filename is not on the engine allow-list. |
 | **`401`** | `UNAUTHORIZED` | Missing or invalid Better Auth HTTP-only session cookie. |
