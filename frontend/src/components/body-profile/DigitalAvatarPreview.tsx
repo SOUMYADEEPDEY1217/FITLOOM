@@ -526,6 +526,26 @@ export function DigitalAvatarPreview({
           : Math.round(rawWeight * 10) / 10;
     }
 
+    if (
+      resolvedHeightCm !== undefined &&
+      (Number.isNaN(resolvedHeightCm) || resolvedHeightCm < 130 || resolvedHeightCm > 220)
+    ) {
+      setPhotoUploadError("Height must be between 130 and 220 cm");
+      return;
+    }
+
+    if (
+      resolvedWeightKg !== undefined &&
+      (Number.isNaN(resolvedWeightKg) || resolvedWeightKg < 30 || resolvedWeightKg > 200)
+    ) {
+      setPhotoUploadError(
+        photoWeightUnit === "lb"
+          ? "Weight must be between 66 and 441 lb (30–200 kg)"
+          : "Weight must be between 30 and 200 kg"
+      );
+      return;
+    }
+
     setIsUploadingPhotos(true);
     setPhotoUploadError(null);
 
@@ -1521,6 +1541,8 @@ export function DigitalAvatarPreview({
                   id="photo-weight"
                   type="number"
                   step="0.5"
+                  min={photoWeightUnit === "kg" ? "30" : "66"}
+                  max={photoWeightUnit === "kg" ? "200" : "441"}
                   placeholder={photoWeightUnit === "kg" ? "e.g. 55" : "e.g. 121"}
                   value={photoWeight}
                   onChange={(e) => {

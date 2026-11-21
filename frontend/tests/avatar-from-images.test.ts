@@ -417,7 +417,52 @@ describe("POST /api/avatar/from-images", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("10. returns 400 VALIDATION_ERROR on invalid enum values or unknown strict fields", async () => {
+  it("10. returns 400 VALIDATION_ERROR on invalid weight (< 30 kg or > 200 kg, including 201)", async () => {
+    // Too light (< 30)
+    mockSession(TEST_USER);
+    const fdLight = new FormData();
+    fdLight.append(
+      "front",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", { type: "image/jpeg" })
+    );
+    fdLight.append("weight_kg", "25");
+
+    const reqLight = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000" },
+      body: fdLight,
+    });
+    const resLight = await postAvatarFromImages(reqLight);
+    expect(resLight.status).toBe(400);
+    const jsonLight = await resLight.json();
+    expect(jsonLight.ok).toBe(false);
+    expect(jsonLight.error.code).toBe("VALIDATION_ERROR");
+    expect(jsonLight.error.fieldErrors?.weight_kg).toMatch(/between 30 and 200 kg/i);
+
+    // Over 200 kg (201 must be rejected)
+    mockSession(TEST_USER);
+    const fdHeavy = new FormData();
+    fdHeavy.append(
+      "front",
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], "front.jpg", { type: "image/jpeg" })
+    );
+    fdHeavy.append("weight_kg", "201");
+
+    const reqHeavy = new NextRequest("http://localhost:3000/api/avatar/from-images", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000" },
+      body: fdHeavy,
+    });
+    const resHeavy = await postAvatarFromImages(reqHeavy);
+    expect(resHeavy.status).toBe(400);
+    const jsonHeavy = await resHeavy.json();
+    expect(jsonHeavy.ok).toBe(false);
+    expect(jsonHeavy.error.code).toBe("VALIDATION_ERROR");
+    expect(jsonHeavy.error.fieldErrors?.weight_kg).toMatch(/between 30 and 200 kg/i);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("11. returns 400 VALIDATION_ERROR on invalid enum values or unknown strict fields", async () => {
     // Invalid gender enum
     mockSession(TEST_USER);
     const fdGender = new FormData();

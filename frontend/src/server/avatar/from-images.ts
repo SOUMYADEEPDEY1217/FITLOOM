@@ -23,8 +23,8 @@ export const AvatarFromImagesFormSchema = z
     weight_kg: z
       .number({ invalid_type_error: "Weight must be a valid number" })
       .finite("Weight must be a finite number")
-      .min(30, "Weight must be between 30 and 250 kg")
-      .max(250, "Weight must be between 30 and 250 kg")
+      .min(30, "Weight must be between 30 and 200 kg")
+      .max(200, "Weight must be between 30 and 200 kg")
       .optional(),
     clothing_fit: PhotoClothingFitSchema.optional().default("regular"),
     build_type: PhotoBuildTypeSchema.optional().default("average"),

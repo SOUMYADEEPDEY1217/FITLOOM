@@ -129,7 +129,7 @@ export const POST = createApiHandler(
       profileWeight !== undefined &&
       !Number.isNaN(profileWeight) &&
       profileWeight >= 30 &&
-      profileWeight <= 250
+      profileWeight <= 200
         ? profileWeight
         : undefined;
 
