@@ -196,6 +196,7 @@ interface FitloomContextValue {
   isLoadingAuth: boolean;
 
   avatarId: string | null;
+  setAvatarId: (id: string | null) => void;
   avatarAssets: {
     apose: string;
     tpose: string;
@@ -1965,6 +1966,7 @@ export function FitloomProvider({ children }: { children: React.ReactNode }) {
         refreshSession,
         isLoadingAuth,
         avatarId,
+        setAvatarId,
         avatarAssets,
         avatarServiceOffline,
         isGeneratingAvatar,

@@ -86,6 +86,7 @@ export interface RouteHandlerOptions<TBody = unknown> {
   };
   skipCsrf?: boolean;
   successStatus?: number;
+  multipart?: boolean;
 }
 
 const MAX_BODY_BYTES = 1024 * 1024; // 1MB payload cap
@@ -238,66 +239,85 @@ export function createApiHandler<TBody = unknown, TResult = unknown>(
       let parsedBody: TBody = undefined as unknown as TBody;
 
       if (["POST", "PUT", "PATCH"].includes(method)) {
-        const contentType = req.headers.get("content-type") || "";
-
-        const contentLengthHeader = req.headers.get("content-length");
-        if (contentLengthHeader && parseInt(contentLengthHeader, 10) > MAX_BODY_BYTES) {
-          throw new ApiError(
-            413,
-            "PAYLOAD_TOO_LARGE",
-            "Request body exceeds 1MB limit"
-          );
-        }
-
-        let rawText = "";
-        try {
-          rawText = await req.text();
-        } catch {
-          rawText = "";
-        }
-
-        if (rawText.length > MAX_BODY_BYTES) {
-          throw new ApiError(
-            413,
-            "PAYLOAD_TOO_LARGE",
-            "Request body exceeds 1MB limit"
-          );
-        }
-
-        if (rawText.trim().length > 0) {
-          if (!contentType.includes("application/json")) {
+        if (options.multipart) {
+          const contentType = req.headers.get("content-type") || "";
+          if (!contentType.includes("multipart/form-data")) {
             throw new ApiError(
               415,
               "UNSUPPORTED_MEDIA_TYPE",
-              "Content-Type must be application/json"
+              "Content-Type must be multipart/form-data"
             );
           }
-
-          try {
-            parsedBody = JSON.parse(rawText) as TBody;
-          } catch {
-            throw new ApiError(400, "BAD_REQUEST", "Invalid JSON body");
-          }
-        }
-
-        if (options.schema) {
-          const validationResult = options.schema.safeParse(parsedBody);
-          if (!validationResult.success) {
-            const fieldErrors: Record<string, string> = {};
-            for (const issue of validationResult.error.issues) {
-              const key = issue.path.join(".") || "body";
-              if (!fieldErrors[key]) {
-                fieldErrors[key] = issue.message;
-              }
-            }
+          const contentLengthHeader = req.headers.get("content-length");
+          if (contentLengthHeader && parseInt(contentLengthHeader, 10) > 12 * 1024 * 1024) {
             throw new ApiError(
-              400,
-              "VALIDATION_ERROR",
-              "Validation failed",
-              fieldErrors
+              413,
+              "PAYLOAD_TOO_LARGE",
+              "Request body exceeds size limit"
             );
           }
-          parsedBody = validationResult.data;
+        } else {
+          const contentType = req.headers.get("content-type") || "";
+
+          const contentLengthHeader = req.headers.get("content-length");
+          if (contentLengthHeader && parseInt(contentLengthHeader, 10) > MAX_BODY_BYTES) {
+            throw new ApiError(
+              413,
+              "PAYLOAD_TOO_LARGE",
+              "Request body exceeds 1MB limit"
+            );
+          }
+
+          let rawText = "";
+          try {
+            rawText = await req.text();
+          } catch {
+            rawText = "";
+          }
+
+          if (rawText.length > MAX_BODY_BYTES) {
+            throw new ApiError(
+              413,
+              "PAYLOAD_TOO_LARGE",
+              "Request body exceeds 1MB limit"
+            );
+          }
+
+          if (rawText.trim().length > 0) {
+            if (!contentType.includes("application/json")) {
+              throw new ApiError(
+                415,
+                "UNSUPPORTED_MEDIA_TYPE",
+                "Content-Type must be application/json"
+              );
+            }
+
+            try {
+              parsedBody = JSON.parse(rawText) as TBody;
+            } catch {
+              throw new ApiError(400, "BAD_REQUEST", "Invalid JSON body");
+            }
+          }
+
+          if (options.schema) {
+            const validationResult = options.schema.safeParse(parsedBody);
+            if (!validationResult.success) {
+              const fieldErrors: Record<string, string> = {};
+              for (const issue of validationResult.error.issues) {
+                const key = issue.path.join(".") || "body";
+                if (!fieldErrors[key]) {
+                  fieldErrors[key] = issue.message;
+                }
+              }
+              throw new ApiError(
+                400,
+                "VALIDATION_ERROR",
+                "Validation failed",
+                fieldErrors
+              );
+            }
+            parsedBody = validationResult.data;
+          }
         }
       }
 

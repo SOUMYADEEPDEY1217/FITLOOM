@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { AlertTriangle, CheckCircle2, Info, Loader2, Sparkles, Trash2, User } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Info, Loader2, Sparkles, Trash2, Upload, User } from "lucide-react";
 import { BodyType, FitPreference, GarmentType, getFitPreferenceEaseCm } from "@/lib/mock-data";
 import {
   LengthFieldKey,
@@ -14,7 +14,7 @@ import { Avatar3DViewer } from "@/components/avatar/Avatar3DViewer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, createAvatarFromImages } from "@/lib/api";
 import {
   ProductsQuery,
   ProductItem,
@@ -66,7 +66,6 @@ export function DigitalAvatarPreview({
   const completedCount = completedKeys.length;
   const totalCount = MEASUREMENT_FIELDS.length;
   const isComplete = completedCount === totalCount;
-  const isEmpty = !hasSavedProfile && completedCount === 0;
 
   // Bounded proportional offsets for illustrative 2D silhouette only
   const shoulderHalf = clamp(
@@ -112,12 +111,23 @@ export function DigitalAvatarPreview({
 
   const {
     avatarId,
+    setAvatarId,
     avatarServiceOffline,
     isGeneratingAvatar,
     generateAvatarPreset,
     checkAvatarStatus,
     toast,
   } = useFitloom();
+
+  const [localAvatarId, setLocalAvatarId] = useState<string | null>(null);
+  const effectiveAvatarId = localAvatarId || avatarId;
+  const isEmpty = !hasSavedProfile && completedCount === 0 && !effectiveAvatarId;
+
+  // Photo Upload State
+  const [frontFile, setFrontFile] = useState<File | null>(null);
+  const [sideFile, setSideFile] = useState<File | null>(null);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState<boolean>(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<"3d" | "2d">("2d");
 
@@ -296,16 +306,19 @@ export function DigitalAvatarPreview({
   }, [checkAvatarStatus]);
 
   useEffect(() => {
-    if (avatarId && !avatarServiceOffline) {
+    if (effectiveAvatarId && !avatarServiceOffline) {
       setViewMode("3d");
     } else {
       setViewMode("2d");
     }
-  }, [avatarId, avatarServiceOffline]);
+  }, [effectiveAvatarId, avatarServiceOffline]);
 
   async function handleGenerateAvatar() {
     const res = await generateAvatarPreset();
     if (res.ok) {
+      if (res.avatarId) {
+        setLocalAvatarId(res.avatarId);
+      }
       setViewMode("3d");
       toast({
         type: "success",
@@ -321,7 +334,55 @@ export function DigitalAvatarPreview({
     }
   }
 
-  const is3DActive = Boolean(avatarId) && !avatarServiceOffline && viewMode === "3d";
+  async function handlePhotoUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!frontFile) {
+      setPhotoUploadError("Front photo is required");
+      return;
+    }
+
+    if (avatarServiceOffline) {
+      setPhotoUploadError("Avatar service offline");
+      return;
+    }
+
+    setIsUploadingPhotos(true);
+    setPhotoUploadError(null);
+
+    try {
+      const res = await createAvatarFromImages({
+        front: frontFile,
+        side: sideFile,
+      });
+
+      setAvatarId(res.avatarId);
+      setLocalAvatarId(res.avatarId);
+      setViewMode("3d");
+      toast({
+        type: "success",
+        title: "3D Avatar Created",
+        message: "Your 3D avatar has been generated from your photos.",
+      });
+      setFrontFile(null);
+      setSideFile(null);
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        if (err.status === 503 || err.code === "SERVICE_UNAVAILABLE") {
+          setPhotoUploadError("Avatar service offline");
+        } else if (err.status === 422 || err.code === "AVATAR_GENERATION_FAILED") {
+          setPhotoUploadError("Could not read a body in this photo, try again");
+        } else {
+          setPhotoUploadError(err.message || "Failed to create avatar from photos");
+        }
+      } else {
+        setPhotoUploadError("Avatar service offline");
+      }
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  }
+
+  const is3DActive = Boolean(effectiveAvatarId) && !avatarServiceOffline && viewMode === "3d";
 
   return (
     <div className="flex flex-col rounded-3xl border border-violet-200/80 bg-gradient-to-b from-white via-[#FAF7FF] to-violet-50/70 p-5 shadow-xs sm:p-6">
@@ -337,7 +398,7 @@ export function DigitalAvatarPreview({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {avatarId && !avatarServiceOffline && (
+          {effectiveAvatarId && !avatarServiceOffline && (
             <div className="flex items-center rounded-lg border border-violet-200 bg-white p-0.5 shadow-2xs">
               <button
                 type="button"
@@ -452,9 +513,9 @@ export function DigitalAvatarPreview({
               : "Create your Body Profile to unlock personalized Fit Intelligence scores, Digital Avatar zone mapping, and CUSTOMFIT sizing."}
           </p>
         </div>
-      ) : is3DActive && avatarId ? (
+      ) : is3DActive && effectiveAvatarId ? (
         <>
-          <Avatar3DViewer avatarId={avatarId} garmentUrl={garmentPanelDressedUrl} className="mt-4" />
+          <Avatar3DViewer avatarId={effectiveAvatarId} garmentUrl={garmentPanelDressedUrl} className="mt-4" />
           {/* Garment Panel */}
           <section
             aria-labelledby="garment-panel-heading"
@@ -905,6 +966,100 @@ export function DigitalAvatarPreview({
           )}
         </>
       )}
+
+      {/* Create from photos section */}
+      <section
+        aria-labelledby="create-from-photos-heading"
+        className="mt-4 rounded-2xl border border-violet-200/80 bg-white/95 p-4 shadow-2xs space-y-3"
+      >
+        <div className="flex items-center gap-2">
+          <Camera className="h-4 w-4 text-[#6633EE]" aria-hidden="true" />
+          <h3
+            id="create-from-photos-heading"
+            className="text-xs font-bold text-slate-900"
+          >
+            Create from photos
+          </h3>
+        </div>
+
+        <form onSubmit={handlePhotoUpload} className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="photo-front"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Front photo <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="photo-front"
+                type="file"
+                accept="image/jpeg,image/png"
+                required
+                onChange={(e) => {
+                  setFrontFile(e.target.files?.[0] ?? null);
+                  setPhotoUploadError(null);
+                }}
+                disabled={isUploadingPhotos}
+                className="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[#6633EE] hover:file:bg-violet-200 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="photo-side"
+                className="block text-xs font-semibold text-slate-700"
+              >
+                Side photo <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="photo-side"
+                type="file"
+                accept="image/jpeg,image/png"
+                onChange={(e) => {
+                  setSideFile(e.target.files?.[0] ?? null);
+                  setPhotoUploadError(null);
+                }}
+                disabled={isUploadingPhotos}
+                className="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:cursor-pointer file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[#6633EE] hover:file:bg-violet-200 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            Photos are sent to the avatar engine, not stored
+          </p>
+
+          {photoUploadError && (
+            <div
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50/90 p-2.5 text-xs text-red-900"
+            >
+              <div className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />
+                <span>{photoUploadError}</span>
+              </div>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            disabled={isUploadingPhotos || !frontFile}
+            className="w-full cursor-pointer bg-[#6633EE] hover:bg-[#5522DD] text-white font-semibold text-xs py-2"
+          >
+            {isUploadingPhotos ? (
+              <>
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                This can take up to a minute
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-3.5 w-3.5" />
+                Upload
+              </>
+            )}
+          </Button>
+        </form>
+      </section>
 
       {/* Available Profile Summary Tags */}
       <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-violet-100 bg-white/85 p-3.5 text-xs sm:grid-cols-3">
