@@ -92,4 +92,73 @@ describe("api client", () => {
     const result = await api.delete("/api/items/1");
     expect(result).toBeUndefined();
   });
+
+  it("calls getProducts with query parameters", async () => {
+    const mockProductsData = {
+      products: [{ id: "sky-oxford-shirt", name: "Sky Oxford Shirt" }],
+      pagination: { page: 1, limit: 12, total: 1, totalPages: 1 },
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ok: true, data: mockProductsData }),
+    } as unknown as Response);
+
+    const result = await api.getProducts({ category: "Shirts", garmentType: "shirt", search: "oxford" });
+    expect(result).toEqual(mockProductsData);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/products?category=Shirts&garmentType=shirt&search=oxford"),
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("calls getProduct with ID parameter", async () => {
+    const mockProduct = {
+      product: { id: "sky-oxford-shirt", name: "Sky Oxford Shirt" },
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ok: true, data: mockProduct }),
+    } as unknown as Response);
+
+    const result = await api.getProduct("sky-oxford-shirt");
+    expect(result).toEqual(mockProduct);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/products/sky-oxford-shirt",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("calls fitCheck with body payload", async () => {
+    const mockFitResult = {
+      productId: "sky-oxford-shirt",
+      recommendedSize: "L",
+      status: "ready",
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ok: true, data: mockFitResult }),
+    } as unknown as Response);
+
+    const result = await api.fitCheck({
+      productId: "sky-oxford-shirt",
+      fitPreference: "regular",
+    });
+    expect(result).toEqual(mockFitResult);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/fit-check",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          productId: "sky-oxford-shirt",
+          fitPreference: "regular",
+        }),
+      })
+    );
+  });
 });
