@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { GET as getAvatarStatus } from "@/app/api/avatar/status/route";
 import { POST as postAvatarPreset } from "@/app/api/avatar/preset/route";
 import { POST as postAvatarSizing } from "@/app/api/avatar/sizing/route";
+import { POST as postAvatarDress } from "@/app/api/avatar/dress/route";
 import { GET as getAvatarAsset } from "@/app/api/avatar/assets/[avatarId]/[file]/route";
 import { GET as getBodyProfile } from "@/app/api/body-profile/route";
 import { POST as authRoute } from "@/app/api/auth/[...all]/route";
@@ -661,6 +662,332 @@ describe("Avatar Engine Integration & Security", () => {
       // At least one of the later attempts must be rate-limited (429)
       const hasRateLimited = attempts.some((res) => res.status === 429);
       expect(hasRateLimited).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // 6. AVATAR DRESS ENDPOINT (/api/avatar/dress)
+  // ===========================================================================
+  describe("POST /api/avatar/dress", () => {
+    it("returns 401 UNAUTHORIZED when no session is present", async () => {
+      mockSession(null);
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "M",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(401);
+      const json = await res.json();
+      expect(json.ok).toBe(false);
+      expect(json.error.code).toBe("UNAUTHORIZED");
+    });
+
+    it("returns 400 on invalid input validation", async () => {
+      mockSession(USER_A);
+
+      // Invalid avatarId
+      const req1 = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "not-hex-id",
+          garmentType: "shirt",
+          size: "M",
+        }),
+      });
+      const res1 = await postAvatarDress(req1);
+      expect(res1.status).toBe(400);
+
+      // Invalid garmentType
+      mockSession(USER_A);
+      const req2 = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "hoodie",
+          size: "M",
+        }),
+      });
+      const res2 = await postAvatarDress(req2);
+      expect(res2.status).toBe(400);
+
+      // Invalid size
+      mockSession(USER_A);
+      const req3 = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "3XL",
+        }),
+      });
+      const res3 = await postAvatarDress(req3);
+      expect(res3.status).toBe(400);
+
+      // Strict schema rejects extra fields
+      mockSession(USER_A);
+      const req4 = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "M",
+          unrecognizedField: "malicious",
+        }),
+      });
+      const res4 = await postAvatarDress(req4);
+      expect(res4.status).toBe(400);
+    });
+
+    it("returns 404 AVATAR_NOT_FOUND when avatar does not belong to session user (never 403)", async () => {
+      mockSession(USER_A);
+
+      // Avatar belongs to USER_B
+      const mockAvatarsFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            { id: "avatar-b", userId: USER_B.id },
+          ]),
+        }),
+      });
+      vi.mocked(db.select).mockReturnValueOnce({ from: mockAvatarsFrom } as any);
+
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "M",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.ok).toBe(false);
+      expect(json.error.code).toBe("AVATAR_NOT_FOUND");
+    });
+
+    it("returns 404 AVATAR_NOT_FOUND when avatar does not exist", async () => {
+      mockSession(USER_A);
+
+      // Avatar does not exist
+      const mockAvatarsFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      });
+      vi.mocked(db.select).mockReturnValueOnce({ from: mockAvatarsFrom } as any);
+
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "M",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.ok).toBe(false);
+      expect(json.error.code).toBe("AVATAR_NOT_FOUND");
+    });
+
+    it("returns 503 SERVICE_UNAVAILABLE when engine is down or returns 500", async () => {
+      mockSession(USER_A);
+
+      // Avatar owned by USER_A
+      const mockAvatarsFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            { id: "avatar-a", userId: USER_A.id },
+          ]),
+        }),
+      });
+      vi.mocked(db.select).mockReturnValueOnce({ from: mockAvatarsFrom } as any);
+
+      // Engine throws connection refused
+      (global.fetch as any).mockRejectedValueOnce(
+        new TypeError("fetch failed: ECONNREFUSED")
+      );
+
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "M",
+          fitPreference: "regular",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(503);
+      const json = await res.json();
+      expect(json.ok).toBe(false);
+      expect(json.error.code).toBe("SERVICE_UNAVAILABLE");
+    });
+
+    it("maps app fit 'oversized' to engine 'extended' and returns valid asset url", async () => {
+      mockSession(USER_A);
+
+      // Avatar owned by USER_A
+      const mockAvatarsFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            { id: "avatar-a", userId: USER_A.id },
+          ]),
+        }),
+      });
+      vi.mocked(db.select).mockReturnValueOnce({ from: mockAvatarsFrom } as any);
+
+      // Mock engine dress endpoint
+      (global.fetch as any).mockImplementationOnce(
+        async (url: string, init: RequestInit) => {
+          expect(url).toContain("/avatars/deadbeef/dress");
+          const body = init.body as FormData;
+          expect(body.get("fit_preference")).toBe("extended"); // oversized -> extended
+          expect(body.get("garment_type")).toBe("shirt");
+          expect(body.get("size")).toBe("XL");
+
+          return new Response(
+            JSON.stringify({
+              avatar_id: "deadbeef",
+              garment_type: "shirt",
+              slot: "top",
+              glb_url: "/avatars/deadbeef/garment/garment_shirt.glb",
+              selected: { size: "XL" },
+              sizing: { recommended_size: "XL" },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      );
+
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "shirt",
+          size: "XL",
+          fitPreference: "oversized",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(json.data.mode).toBe("live_avatar_engine");
+      expect(json.data.garment).toEqual({
+        type: "shirt",
+        size: "XL",
+        fitPreference: "oversized",
+        url: "/api/avatar/assets/deadbeef/garment_shirt.glb",
+      });
+    });
+
+    it("defaults fitPreference to user's saved body profile when omitted in request", async () => {
+      mockSession(USER_A);
+
+      // 1. Avatar ownership check
+      const mockAvatarsFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            { id: "avatar-a", userId: USER_A.id },
+          ]),
+        }),
+      });
+      // 2. Body profile fitPreference lookup
+      const mockProfileFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            { fitPreference: "relaxed" },
+          ]),
+        }),
+      });
+      vi.mocked(db.select)
+        .mockReturnValueOnce({ from: mockAvatarsFrom } as any)
+        .mockReturnValueOnce({ from: mockProfileFrom } as any);
+
+      (global.fetch as any).mockImplementationOnce(
+        async (_url: string, init: RequestInit) => {
+          const body = init.body as FormData;
+          expect(body.get("fit_preference")).toBe("relaxed");
+
+          return new Response(
+            JSON.stringify({
+              avatar_id: "deadbeef",
+              garment_type: "tshirt",
+              slot: "top",
+              glb_url: "/avatars/deadbeef/garment/garment_tshirt.glb",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      );
+
+      const req = new NextRequest("http://localhost:3000/api/avatar/dress", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({
+          avatarId: "deadbeef",
+          garmentType: "tshirt",
+          size: "M",
+        }),
+      });
+
+      const res = await postAvatarDress(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(json.data.garment.fitPreference).toBe("relaxed");
+      expect(json.data.garment.url).toBe("/api/avatar/assets/deadbeef/garment_tshirt.glb");
     });
   });
 });
